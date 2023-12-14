@@ -49,8 +49,7 @@ let interval = null;
 let num_suika = 0;
 
 function addFruit() {
-  // const index = Math.floor(Math.random() * 5);
-  const index = 9
+  const index = Math.floor(Math.random() * 5);
   const fruit = FRUITS[index];
 
   const body = Bodies.circle(300, 50, fruit.radius, {
