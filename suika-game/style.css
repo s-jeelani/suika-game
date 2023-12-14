@@ -2,7 +2,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh; /* Full viewport height */
-  margin: 0; /* Remove default margin */
-  background-color: #f7f4c8; /* Optional: background color */
+  min-height: 100vh; 
+  margin: 0; 
+  background-color: #f7f4c8; 
 }
