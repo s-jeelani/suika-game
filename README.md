@@ -2,7 +2,7 @@
 
 ## Description
 
-The game involves the player trying to build a high-score through dropping fruits into a container without having them overflow out of the container.
+Suika Game (the Watermelon Game) is a simple fruit drop puzzle game that requires you to combine fruit to create bigger fruit by dropping them into a box beside each other. The goal is to "evolve" these fruits into bigger and bigger fruits, up to a watermelon, to get the highest score.
 
 ## Technologies Used
 
