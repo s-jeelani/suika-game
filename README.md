@@ -13,6 +13,7 @@ Before you begin, ensure you have met the following requirements:
 ## Installation
 
 git clone https://github.com/hahjimah/suika-game
-cd suika-game
-npm install
-npm run dev
+
+- cd suika-game
+- npm install
+- npm run dev
