@@ -7,9 +7,11 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+    origin: ["http://localhost:5173", "http://localhost:4173", "https://*.vercel.app", "*"],
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  allowEIO3: true
 });
 
 app.use(cors());
@@ -22,8 +24,18 @@ const playerScores = new Map();
 // Serve static files
 app.use(express.static('public'));
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.send('Suika Game Server is running!');
+});
+
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('User connected:', socket.id, 'from:', socket.handshake.headers.origin);
 
   socket.on('joinGame', (roomId) => {
     socket.join(roomId);

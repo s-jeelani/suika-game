@@ -2,8 +2,13 @@ import {Bodies, Body, Events, Engine, Render, Runner, World} from "matter-js"
 import { FRUITS } from './fruits.js'
 import { SERVER_URL } from './config.js'
 
-// Socket.IO connection
-const socket = io(SERVER_URL);
+// Socket.IO connection with better error handling
+console.log('Connecting to server:', SERVER_URL);
+const socket = io(SERVER_URL, {
+  timeout: 10000,
+  transports: ['websocket', 'polling'],
+  forceNew: true
+});
 
 // Game state
 let currentPlayer = null;
@@ -450,15 +455,41 @@ function handleCollision(event, playerNum) {
 function setupSocketEvents() {
   // Socket.IO event handlers
   socket.on('connect', () => {
+    console.log('Connected to server successfully');
     if (connectionStatus) {
       connectionStatus.textContent = 'Connected to server';
       connectionStatus.style.backgroundColor = '#4CAF50';
     }
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
+    console.log('Disconnected from server:', reason);
     if (connectionStatus) {
       connectionStatus.textContent = 'Disconnected from server';
+      connectionStatus.style.backgroundColor = '#f44336';
+    }
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Connection failed - check server';
+      connectionStatus.style.backgroundColor = '#f44336';
+    }
+  });
+
+  socket.on('reconnect', (attemptNumber) => {
+    console.log('Reconnected after', attemptNumber, 'attempts');
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Reconnected to server';
+      connectionStatus.style.backgroundColor = '#4CAF50';
+    }
+  });
+
+  socket.on('reconnect_error', (error) => {
+    console.error('Reconnection error:', error);
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Reconnection failed';
       connectionStatus.style.backgroundColor = '#f44336';
     }
   });
@@ -578,8 +609,16 @@ function setupJoinGameButton() {
   // Join game button handler
   if (joinGameBtn && roomIdInput) {
     joinGameBtn.addEventListener('click', () => {
-      roomId = roomIdInput.value || 'room1';
-      socket.emit('joinGame', roomId);
+      if (socket.connected) {
+        roomId = roomIdInput.value || 'room1';
+        socket.emit('joinGame', roomId);
+      } else {
+        console.error('Not connected to server');
+        if (connectionStatus) {
+          connectionStatus.textContent = 'Not connected - cannot join game';
+          connectionStatus.style.backgroundColor = '#f44336';
+        }
+      }
     });
   }
 
@@ -587,4 +626,19 @@ function setupJoinGameButton() {
   if (connectionStatus) {
     connectionStatus.textContent = 'Connecting to server...';
   }
+  
+  // Test server connection
+  console.log('Testing server connection to:', SERVER_URL);
+  fetch(SERVER_URL + '/health')
+    .then(response => response.json())
+    .then(data => {
+      console.log('Server health check passed:', data);
+    })
+    .catch(error => {
+      console.error('Server health check failed:', error);
+      if (connectionStatus) {
+        connectionStatus.textContent = 'Server not reachable';
+        connectionStatus.style.backgroundColor = '#f44336';
+      }
+    });
 } 
