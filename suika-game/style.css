@@ -1,8 +1,128 @@
 body {
+  margin: 0;
+  padding: 20px;
+  background-color: #f7f4c8;
+  font-family: Arial, sans-serif;
+  overflow-x: auto;
+}
+
+#game-wrapper {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+#scoreboard {
   display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.score {
+  padding: 10px 20px;
+  background-color: #E6B143;
+  border-radius: 10px;
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+#game-container {
+  display: flex;
+  gap: 20px;
   justify-content: center;
+}
+
+.game-side {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  min-height: 100vh; 
-  margin: 0; 
-  background-color: #f7f4c8; 
+  gap: 20px;
+}
+
+canvas {
+  border: 3px solid #E6B143;
+  border-radius: 10px;
+  background-color: #F7f4C8;
+}
+
+.next-fruit {
+  width: 200px;
+  height: 150px;
+  background-color: #E6B143;
+  border-radius: 10px;
+  padding: 15px;
+  text-align: center;
+  color: white;
+}
+
+
+
+.next-fruit h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+}
+
+.next-fruit img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+
+#connection-status, #turn-indicator {
+  text-align: center;
+  margin: 20px 0;
+  padding: 10px;
+  border-radius: 5px;
+  font-weight: bold;
+}
+
+#connection-status {
+  background-color: #ffeb3b;
+}
+
+#turn-indicator {
+  background-color: #2196F3;
+  color: white;
+}
+
+#game-controls {
+  text-align: center;
+  margin-top: 20px;
+}
+
+#join-game {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+#join-game:hover {
+  background-color: #45a049;
+}
+
+#room-id {
+  padding: 10px;
+  font-size: 16px;
+  border: 2px solid #ddd;
+  border-radius: 5px;
+  width: 150px;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+  #game-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .game-side {
+    width: 100%;
+    max-width: 600px;
+  }
 }

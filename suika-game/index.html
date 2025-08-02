@@ -3,11 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Suika Game</title>
+    <title>Multiplayer Suika Game</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 </head>
 <body>
-    <div id="game-container"></div>
-    <script type="module" src="main.js"></script>
+    <div id="game-wrapper">
+        <!-- Scoreboards -->
+        <div id="scoreboard">
+            <div id="player1-score" class="score">Player 1: 0</div>
+            <div id="player2-score" class="score">Player 2: 0</div>
+        </div>
+        
+        <!-- Game containers -->
+        <div id="game-container">
+            <div id="player1-game" class="game-side">
+                <canvas id="player1-canvas"></canvas>
+                <div id="player1-next" class="next-fruit">
+                    <h3>Player 1 - Next Fruit</h3>
+                    <div id="player1-next-fruit"></div>
+                </div>
+            </div>
+            <div id="player2-game" class="game-side">
+                <canvas id="player2-canvas"></canvas>
+                <div id="player2-next" class="next-fruit">
+                    <h3>Player 2 - Next Fruit</h3>
+                    <div id="player2-next-fruit"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Connection status -->
+        <div id="connection-status">Connecting...</div>
+        <div id="turn-indicator">Waiting for game to start...</div>
+        
+        <!-- Game controls -->
+        <div id="game-controls">
+            <button id="join-game">Join Game</button>
+            <input type="text" id="room-id" placeholder="Enter Room ID" value="room1">
+        </div>
+    </div>
+    <script type="module" src="multiplayer.js"></script>
 </body>
 </html>
