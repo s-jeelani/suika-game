@@ -1,5 +1,5 @@
 import {Bodies, Body, Events, Engine, Render, Runner, World} from "matter-js"
-import { FRUITS } from './fruits'
+import { FRUITS } from './fruits.js'
 import { SERVER_URL } from './config.js'
 
 // Socket.IO connection
@@ -27,41 +27,97 @@ const FRUIT_SCORES = {
   10: 10000 // watermelon
 };
 
-// DOM elements
-const connectionStatus = document.getElementById('connection-status');
-const turnIndicator = document.getElementById('turn-indicator');
-const joinGameBtn = document.getElementById('join-game');
-const roomIdInput = document.getElementById('room-id');
-const player1Score = document.getElementById('player1-score');
-const player2Score = document.getElementById('player2-score');
-const player1NextFruit = document.getElementById('player1-next-fruit');
-const player2NextFruit = document.getElementById('player2-next-fruit');
+// Initialize DOM elements (will be set when DOM is ready)
+let connectionStatus, turnIndicator, joinGameBtn, roomIdInput;
+let player1Score, player2Score, player1NextFruit, player2NextFruit;
+
+// Function to initialize DOM elements
+function initializeDOMElements() {
+  connectionStatus = document.getElementById('connection-status');
+  turnIndicator = document.getElementById('turn-indicator');
+  joinGameBtn = document.getElementById('join-game');
+  roomIdInput = document.getElementById('room-id');
+  player1Score = document.getElementById('player1-score');
+  player2Score = document.getElementById('player2-score');
+  player1NextFruit = document.getElementById('player1-next-fruit');
+  player2NextFruit = document.getElementById('player2-next-fruit');
+  
+  console.log('DOM elements initialized:', {
+    connectionStatus: !!connectionStatus,
+    turnIndicator: !!turnIndicator,
+    joinGameBtn: !!joinGameBtn,
+    roomIdInput: !!roomIdInput,
+    player1Score: !!player1Score,
+    player2Score: !!player2Score,
+    player1NextFruit: !!player1NextFruit,
+    player2NextFruit: !!player2NextFruit
+  });
+}
 
 // Game engines and renders for both players
 const engine1 = Engine.create();
 const engine2 = Engine.create();
 
-const render1 = Render.create({
-  engine: engine1,
-  canvas: document.getElementById('player1-canvas'),
-  options: {
-    wireframes: false,
-    background: "#F7f4C8",
-    width: 600,
-    height: 800
-  }
-});
+// Initialize game when DOM is ready
+let render1, render2, canvas1, canvas2;
 
-const render2 = Render.create({
-  engine: engine2,
-  canvas: document.getElementById('player2-canvas'),
-  options: {
-    wireframes: false,
-    background: "#F7f4C8",
-    width: 600,
-    height: 800
+function initializeGame() {
+  console.log('Initializing game...');
+  
+  // Initialize DOM elements
+  initializeDOMElements();
+  
+  // Get canvas elements
+  canvas1 = document.getElementById('player1-canvas');
+  canvas2 = document.getElementById('player2-canvas');
+
+  console.log('Canvas 1 found:', !!canvas1);
+  console.log('Canvas 2 found:', !!canvas2);
+
+  if (!canvas1 || !canvas2) {
+    console.error('Canvases not found!');
+    return false;
   }
-});
+
+  render1 = Render.create({
+    engine: engine1,
+    canvas: canvas1,
+    options: {
+      wireframes: false,
+      background: "#F7f4C8",
+      width: 600,
+      height: 800
+    }
+  });
+
+  render2 = Render.create({
+    engine: engine2,
+    canvas: canvas2,
+    options: {
+      wireframes: false,
+      background: "#F7f4C8",
+      width: 600,
+      height: 800
+    }
+  });
+  
+  return true;
+}
+
+// Wait for DOM to be ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing game...');
+    if (initializeGame()) {
+      startGame();
+    }
+  });
+} else {
+  console.log('DOM already loaded, initializing game...');
+  if (initializeGame()) {
+    startGame();
+  }
+}
 
 // Separate game states for each player
 const gameStates = {
@@ -114,15 +170,30 @@ function initializeWorld(world, isPlayer1) {
   World.add(world, [leftWall, rightWall, groundWall, topLine]);
 }
 
-// Initialize both worlds
-initializeWorld(gameStates.player1.world, true);
-initializeWorld(gameStates.player2.world, false);
+function startGame() {
+  console.log('Starting game...');
+  
+  // Initialize both worlds
+  initializeWorld(gameStates.player1.world, true);
+  initializeWorld(gameStates.player2.world, false);
 
-// Start renders and runners for both games
-Render.run(render1);
-Render.run(render2);
-Runner.run(engine1);
-Runner.run(engine2);
+  // Start renders and runners for both games
+  Render.run(render1);
+  Render.run(render2);
+  Runner.run(engine1);
+  Runner.run(engine2);
+  
+  // Set up collision detection
+  setupCollisionDetection();
+  
+  // Set up socket events
+  setupSocketEvents();
+  
+  // Set up join game button
+  setupJoinGameButton();
+  
+  console.log('Game started successfully!');
+}
 
 // Add fruit to game for a specific player
 function addFruit(playerNum) {
@@ -146,7 +217,7 @@ function addFruitWithIndex(playerNum, index) {
     index: index,
     isSleeping: true,
     render: {
-      sprite: { texture: `./public/${fruit.name}.png` }
+      sprite: { texture: `/${fruit.name}.png` }
     },
     restitution: 0.2,
     isDropped: false // Track if fruit has been dropped
@@ -170,7 +241,7 @@ function addFruitWithIndex(playerNum, index) {
 // Update next fruit display
 function updateNextFruitDisplay(playerNum, fruit) {
   const container = playerNum === 1 ? player1NextFruit : player2NextFruit;
-  container.innerHTML = `<img src="./public/${fruit.name}.png" alt="${fruit.name}">`;
+  container.innerHTML = `<img src="/${fruit.name}.png" alt="${fruit.name}">`;
 }
 
 // Update turn indicator
@@ -310,14 +381,16 @@ function setupEventListeners() {
   console.log('Right canvas exists:', !!render2.canvas);
 }
 
-// Collision detection for both games
-Events.on(engine1, "collisionStart", (event) => {
-  handleCollision(event, 1);
-});
+function setupCollisionDetection() {
+  // Collision detection for both games
+  Events.on(engine1, "collisionStart", (event) => {
+    handleCollision(event, 1);
+  });
 
-Events.on(engine2, "collisionStart", (event) => {
-  handleCollision(event, 2);
-});
+  Events.on(engine2, "collisionStart", (event) => {
+    handleCollision(event, 2);
+  });
+}
 
 function handleCollision(event, playerNum) {
   const gameState = gameStates[`player${playerNum}`];
@@ -337,7 +410,7 @@ function handleCollision(event, playerNum) {
         collision.collision.supports[0].x,
         collision.collision.supports[0].y,
         newFruit.radius,{
-          render: {sprite: {texture: `./public/${newFruit.name}.png`}
+          render: {sprite: {texture: `/${newFruit.name}.png`}
         },
           index: index + 1,
         }
@@ -374,39 +447,46 @@ function handleCollision(event, playerNum) {
   });
 }
 
-// Socket.IO event handlers
-socket.on('connect', () => {
-  connectionStatus.textContent = 'Connected to server';
-  connectionStatus.style.backgroundColor = '#4CAF50';
-});
+function setupSocketEvents() {
+  // Socket.IO event handlers
+  socket.on('connect', () => {
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Connected to server';
+      connectionStatus.style.backgroundColor = '#4CAF50';
+    }
+  });
 
-socket.on('disconnect', () => {
-  connectionStatus.textContent = 'Disconnected from server';
-  connectionStatus.style.backgroundColor = '#f44336';
-});
+  socket.on('disconnect', () => {
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Disconnected from server';
+      connectionStatus.style.backgroundColor = '#f44336';
+    }
+  });
 
-socket.on('joinedRoom', (data) => {
-  playerNumber = data.playerNumber;
-  myPlayerNumber = data.playerNumber; // Set which player I control
-  connectionStatus.textContent = `Joined room ${data.roomId} as Player ${data.playerNumber}`;
-  connectionStatus.style.backgroundColor = '#2196F3';
-  
-  console.log(`I am player ${myPlayerNumber}`);
-  
-  // Set up event listeners immediately when player number is assigned
-  setTimeout(() => {
-    setupEventListeners();
-  }, 100);
-  
-  // Update UI to show which side I control
-  if (myPlayerNumber === 1) {
-    document.getElementById('player1-score').style.backgroundColor = '#4CAF50';
-    document.getElementById('player1-score').style.color = 'white';
-  } else if (myPlayerNumber === 2) {
-    document.getElementById('player2-score').style.backgroundColor = '#4CAF50';
-    document.getElementById('player2-score').style.color = 'white';
-  }
-});
+  socket.on('joinedRoom', (data) => {
+    playerNumber = data.playerNumber;
+    myPlayerNumber = data.playerNumber; // Set which player I control
+    if (connectionStatus) {
+      connectionStatus.textContent = `Joined room ${data.roomId} as Player ${data.playerNumber}`;
+      connectionStatus.style.backgroundColor = '#2196F3';
+    }
+    
+    console.log(`I am player ${myPlayerNumber}`);
+    
+    // Set up event listeners immediately when player number is assigned
+    setTimeout(() => {
+      setupEventListeners();
+    }, 100);
+    
+    // Update UI to show which side I control
+    if (myPlayerNumber === 1 && player1Score) {
+      player1Score.style.backgroundColor = '#4CAF50';
+      player1Score.style.color = 'white';
+    } else if (myPlayerNumber === 2 && player2Score) {
+      player2Score.style.backgroundColor = '#4CAF50';
+      player2Score.style.color = 'white';
+    }
+  });
 
 socket.on('gameStart', (data) => {
   gameStarted = true;
@@ -486,16 +566,25 @@ socket.on('newFruit', (data) => {
 
 // Removed game end handler - games continue indefinitely
 
-socket.on('playerLeft', (playerId) => {
-  connectionStatus.textContent = 'Opponent left the game';
-  connectionStatus.style.backgroundColor = '#f44336';
-});
+  socket.on('playerLeft', (playerId) => {
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Opponent left the game';
+      connectionStatus.style.backgroundColor = '#f44336';
+    }
+  });
+}
 
-// Join game button handler
-joinGameBtn.addEventListener('click', () => {
-  roomId = roomIdInput.value || 'room1';
-  socket.emit('joinGame', roomId);
-});
+function setupJoinGameButton() {
+  // Join game button handler
+  if (joinGameBtn && roomIdInput) {
+    joinGameBtn.addEventListener('click', () => {
+      roomId = roomIdInput.value || 'room1';
+      socket.emit('joinGame', roomId);
+    });
+  }
 
-// Initialize connection status
-connectionStatus.textContent = 'Connecting to server...'; 
+  // Initialize connection status
+  if (connectionStatus) {
+    connectionStatus.textContent = 'Connecting to server...';
+  }
+} 

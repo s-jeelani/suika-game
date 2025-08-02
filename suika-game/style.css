@@ -1,14 +1,21 @@
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   padding: 20px;
   background-color: #f7f4c8;
   font-family: Arial, sans-serif;
   overflow-x: auto;
+  min-height: 100vh;
 }
 
 #game-wrapper {
   max-width: 1400px;
   margin: 0 auto;
+  width: 100%;
+  position: relative;
 }
 
 #scoreboard {
@@ -44,6 +51,9 @@ canvas {
   border: 3px solid #E6B143;
   border-radius: 10px;
   background-color: #F7f4C8;
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 .next-fruit {
