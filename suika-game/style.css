@@ -110,6 +110,9 @@ canvas {
   border-radius: 5px;
   cursor: pointer;
   margin-right: 10px;
+  pointer-events: auto;
+  z-index: 1000;
+  position: relative;
 }
 
 #join-game:hover {

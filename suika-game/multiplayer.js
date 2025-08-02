@@ -10,6 +10,48 @@ const socket = io(SERVER_URL, {
   forceNew: true
 });
 
+// Set up critical socket events immediately (before DOM is ready)
+function setupSocketEventsImmediate() {
+  socket.on('connect', () => {
+    console.log('Connected to server successfully - socket ID:', socket.id);
+    // Update status immediately if element exists, otherwise store state
+    updateConnectionStatus('Connected to server', '#4CAF50');
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('Disconnected from server:', reason);
+    updateConnectionStatus('Disconnected from server', '#f44336');
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+    updateConnectionStatus('Connection failed - check server', '#f44336');
+  });
+
+  socket.on('reconnect', (attemptNumber) => {
+    console.log('Reconnected after', attemptNumber, 'attempts');
+    updateConnectionStatus('Reconnected to server', '#4CAF50');
+  });
+
+  socket.on('reconnect_error', (error) => {
+    console.error('Reconnection error:', error);
+    updateConnectionStatus('Reconnection failed', '#f44336');
+  });
+}
+
+// Helper function to update connection status
+function updateConnectionStatus(text, color) {
+  if (connectionStatus) {
+    connectionStatus.textContent = text;
+    connectionStatus.style.backgroundColor = color;
+  } else {
+    // Store for later if DOM not ready yet
+    window.pendingConnectionStatus = { text, color };
+  }
+}
+
+setupSocketEventsImmediate();
+
 // Game state
 let currentPlayer = null;
 let roomId = 'room1';
@@ -57,6 +99,27 @@ function initializeDOMElements() {
     player1NextFruit: !!player1NextFruit,
     player2NextFruit: !!player2NextFruit
   });
+  
+  // Apply any pending connection status
+  if (window.pendingConnectionStatus && connectionStatus) {
+    connectionStatus.textContent = window.pendingConnectionStatus.text;
+    connectionStatus.style.backgroundColor = window.pendingConnectionStatus.color;
+    delete window.pendingConnectionStatus;
+  }
+  
+  // Add a global click test
+  window.testJoinButton = function() {
+    console.log('Testing join button manually...');
+    if (socket.connected) {
+      roomId = roomIdInput?.value || 'room1';
+      console.log('Manually emitting joinGame with roomId:', roomId);
+      socket.emit('joinGame', roomId);
+    } else {
+      console.log('Socket not connected');
+    }
+  };
+  
+  console.log('Added window.testJoinButton() - you can call this from console to test');
 }
 
 // Game engines and renders for both players
@@ -453,48 +516,10 @@ function handleCollision(event, playerNum) {
 }
 
 function setupSocketEvents() {
-  // Socket.IO event handlers
-  socket.on('connect', () => {
-    console.log('Connected to server successfully');
-    if (connectionStatus) {
-      connectionStatus.textContent = 'Connected to server';
-      connectionStatus.style.backgroundColor = '#4CAF50';
-    }
-  });
-
-  socket.on('disconnect', (reason) => {
-    console.log('Disconnected from server:', reason);
-    if (connectionStatus) {
-      connectionStatus.textContent = 'Disconnected from server';
-      connectionStatus.style.backgroundColor = '#f44336';
-    }
-  });
-
-  socket.on('connect_error', (error) => {
-    console.error('Connection error:', error);
-    if (connectionStatus) {
-      connectionStatus.textContent = 'Connection failed - check server';
-      connectionStatus.style.backgroundColor = '#f44336';
-    }
-  });
-
-  socket.on('reconnect', (attemptNumber) => {
-    console.log('Reconnected after', attemptNumber, 'attempts');
-    if (connectionStatus) {
-      connectionStatus.textContent = 'Reconnected to server';
-      connectionStatus.style.backgroundColor = '#4CAF50';
-    }
-  });
-
-  socket.on('reconnect_error', (error) => {
-    console.error('Reconnection error:', error);
-    if (connectionStatus) {
-      connectionStatus.textContent = 'Reconnection failed';
-      connectionStatus.style.backgroundColor = '#f44336';
-    }
-  });
+  // Game-specific socket events (connection events are handled immediately)
 
   socket.on('joinedRoom', (data) => {
+    console.log('Received joinedRoom event:', data);
     playerNumber = data.playerNumber;
     myPlayerNumber = data.playerNumber; // Set which player I control
     if (connectionStatus) {
@@ -519,33 +544,36 @@ function setupSocketEvents() {
     }
   });
 
-socket.on('gameStart', (data) => {
-  gameStarted = true;
-  connectionStatus.textContent = 'Game started!';
-  connectionStatus.style.backgroundColor = '#4CAF50';
-  
-  console.log(`Game starting, I am player ${myPlayerNumber}`);
-  
-  // Set up event listeners for my assigned player (with delay to ensure player number is set)
-  setTimeout(() => {
-    setupEventListeners();
+  socket.on('gameStart', (data) => {
+    console.log('Received gameStart event:', data);
+    gameStarted = true;
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Game started!';
+      connectionStatus.style.backgroundColor = '#4CAF50';
+    }
     
-    // Each player generates their own fruit
-    const myFruitIndex = Math.floor(Math.random() * 5);
+    console.log(`Game starting, I am player ${myPlayerNumber}`);
     
-    // Send my fruit to server for synchronization
-    socket.emit('initializeMyFruit', { 
-      roomId, 
-      playerNumber: myPlayerNumber,
-      fruitIndex: myFruitIndex
-    });
+    // Set up event listeners for my assigned player (with delay to ensure player number is set)
+    setTimeout(() => {
+      setupEventListeners();
+      
+      // Each player generates their own fruit
+      const myFruitIndex = Math.floor(Math.random() * 5);
+      
+      // Send my fruit to server for synchronization
+      socket.emit('initializeMyFruit', { 
+        roomId, 
+        playerNumber: myPlayerNumber,
+        fruitIndex: myFruitIndex
+      });
+      
+      // Add my fruit locally to my game area
+      addFruitWithIndex(myPlayerNumber, myFruitIndex);
+    }, 200); // Longer delay to ensure everything is ready
     
-    // Add my fruit locally to my game area
-    addFruitWithIndex(myPlayerNumber, myFruitIndex);
-  }, 200); // Longer delay to ensure everything is ready
-  
-  updateTurnIndicator();
-});
+    updateTurnIndicator();
+  });
 
 socket.on('scoreUpdate', (scores) => {
   gameState.player1Score = scores.player1Score || 0;
@@ -606,11 +634,33 @@ socket.on('newFruit', (data) => {
 }
 
 function setupJoinGameButton() {
+  console.log('Setting up join game button...');
+  console.log('joinGameBtn exists:', !!joinGameBtn);
+  console.log('roomIdInput exists:', !!roomIdInput);
+  
+  // Try multiple ways to find the button
+  if (!joinGameBtn) {
+    joinGameBtn = document.getElementById('join-game');
+    console.log('Found button on retry:', !!joinGameBtn);
+  }
+  if (!roomIdInput) {
+    roomIdInput = document.getElementById('room-id');
+    console.log('Found input on retry:', !!roomIdInput);
+  }
+  
   // Join game button handler
   if (joinGameBtn && roomIdInput) {
-    joinGameBtn.addEventListener('click', () => {
+    console.log('Adding click listener to join game button');
+    
+    // Function to handle join
+    const handleJoin = () => {
+      console.log('Join game button clicked!');
+      console.log('Socket connected:', socket.connected);
+      console.log('Room ID:', roomIdInput.value);
+      
       if (socket.connected) {
         roomId = roomIdInput.value || 'room1';
+        console.log('Emitting joinGame with roomId:', roomId);
         socket.emit('joinGame', roomId);
       } else {
         console.error('Not connected to server');
@@ -619,12 +669,51 @@ function setupJoinGameButton() {
           connectionStatus.style.backgroundColor = '#f44336';
         }
       }
+    };
+    
+    // Add multiple event listeners to be sure
+    joinGameBtn.addEventListener('click', handleJoin);
+    joinGameBtn.onclick = handleJoin;
+    
+    // Make sure button is clickable
+    joinGameBtn.style.pointerEvents = 'auto';
+    joinGameBtn.style.opacity = '1';
+    joinGameBtn.disabled = false;
+    joinGameBtn.style.cursor = 'pointer';
+    
+    // Test if button is actually clickable
+    joinGameBtn.addEventListener('mouseover', () => {
+      console.log('Mouse over join button');
+    });
+    
+    // Also try to trigger on keypress
+    joinGameBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        console.log('Join button activated via keyboard');
+        handleJoin();
+      }
+    });
+    
+    console.log('Join game button is ready');
+    console.log('Button element:', joinGameBtn);
+  } else {
+    console.error('Join game button or room input not found!');
+    console.error('Available elements:', {
+      'join-game': document.getElementById('join-game'),
+      'room-id': document.getElementById('room-id')
     });
   }
 
   // Initialize connection status
   if (connectionStatus) {
-    connectionStatus.textContent = 'Connecting to server...';
+    // Check if already connected
+    if (socket.connected) {
+      connectionStatus.textContent = 'Connected to server';
+      connectionStatus.style.backgroundColor = '#4CAF50';
+    } else {
+      connectionStatus.textContent = 'Connecting to server...';
+      connectionStatus.style.backgroundColor = '#ffeb3b';
+    }
   }
   
   // Test server connection
