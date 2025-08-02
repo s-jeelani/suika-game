@@ -58,6 +58,7 @@ let roomId = 'room1';
 let gameStarted = false;
 let playerNumber = null;
 let myPlayerNumber = null; // Which player am I controlling
+let eventListenersSet = false;
 
 // Fruit scoring system
 const FRUIT_SCORES = {
@@ -75,8 +76,14 @@ const FRUIT_SCORES = {
 };
 
 // Initialize DOM elements (will be set when DOM is ready)
-let connectionStatus, turnIndicator, joinGameBtn, roomIdInput;
-let player1Score, player2Score, player1NextFruit, player2NextFruit;
+let connectionStatus = null;
+let turnIndicator = null; 
+let joinGameBtn = null;
+let roomIdInput = null;
+let player1Score = null;
+let player2Score = null;
+let player1NextFruit = null;
+let player2NextFruit = null;
 
 // Function to initialize DOM elements
 function initializeDOMElements() {
@@ -126,8 +133,35 @@ function initializeDOMElements() {
 const engine1 = Engine.create();
 const engine2 = Engine.create();
 
-// Initialize game when DOM is ready
-let render1, render2, canvas1, canvas2;
+// Initialize game variables
+let render1 = null;
+let render2 = null;
+let canvas1 = null;
+let canvas2 = null;
+
+// Separate game states for each player (moved up to prevent hoisting issues)
+const gameStates = {
+  player1: {
+    engine: engine1,
+    world: engine1.world,
+    currentBody: null,
+    currentFruit: null,
+    nextFruit: null,
+    disableAction: false,
+    score: 0,
+    num_suika: 0
+  },
+  player2: {
+    engine: engine2,
+    world: engine2.world,
+    currentBody: null,
+    currentFruit: null,
+    nextFruit: null,
+    disableAction: false,
+    score: 0,
+    num_suika: 0
+  }
+};
 
 function initializeGame() {
   console.log('Initializing game...');
@@ -187,29 +221,7 @@ if (document.readyState === 'loading') {
   }
 }
 
-// Separate game states for each player
-const gameStates = {
-  player1: {
-    engine: engine1,
-    world: engine1.world,
-    currentBody: null,
-    currentFruit: null,
-    nextFruit: null,
-    disableAction: false,
-    score: 0,
-    num_suika: 0
-  },
-  player2: {
-    engine: engine2,
-    world: engine2.world,
-    currentBody: null,
-    currentFruit: null,
-    nextFruit: null,
-    disableAction: false,
-    score: 0,
-    num_suika: 0
-  }
-};
+// Game states moved to top of file to prevent hoisting issues
 
 // Initialize game worlds
 function initializeWorld(world, isPlayer1) {
@@ -241,26 +253,30 @@ function initializeWorld(world, isPlayer1) {
 function startGame() {
   console.log('Starting game...');
   
-  // Initialize both worlds
-  initializeWorld(gameStates.player1.world, true);
-  initializeWorld(gameStates.player2.world, false);
+  try {
+    // Initialize both worlds
+    initializeWorld(gameStates.player1.world, true);
+    initializeWorld(gameStates.player2.world, false);
 
-  // Start renders and runners for both games
-  Render.run(render1);
-  Render.run(render2);
-  Runner.run(engine1);
-  Runner.run(engine2);
-  
-  // Set up collision detection
-  setupCollisionDetection();
-  
-  // Set up socket events
-  setupSocketEvents();
-  
-  // Set up join game button
-  setupJoinGameButton();
-  
-  console.log('Game started successfully!');
+    // Start renders and runners for both games
+    Render.run(render1);
+    Render.run(render2);
+    Runner.run(engine1);
+    Runner.run(engine2);
+    
+    // Set up collision detection
+    setupCollisionDetection();
+    
+    // Set up socket events
+    setupSocketEvents();
+    
+    // Set up join game button
+    setupJoinGameButton();
+    
+    console.log('Game started successfully!');
+  } catch (error) {
+    console.error('Error starting game:', error);
+  }
 }
 
 // Add fruit to game for a specific player
@@ -314,19 +330,29 @@ function updateNextFruitDisplay(playerNum, fruit) {
 
 // Update turn indicator
 function updateTurnIndicator() {
+  if (!turnIndicator) return;
+  
   if (!gameStarted) {
-    turnIndicator.textContent = 'Waiting for game to start...';
+    if (myPlayerNumber === 1 || myPlayerNumber === 2) {
+      turnIndicator.textContent = 'Waiting for another player to join...';
+      turnIndicator.style.backgroundColor = '#FF9800';
+    } else {
+      turnIndicator.textContent = 'Waiting for game to start...';
+      turnIndicator.style.backgroundColor = '#ffeb3b';
+    }
     return;
   }
   
   if (myPlayerNumber === 1) {
     turnIndicator.textContent = 'You control the LEFT side (Player 1). Compete against the right side!';
+    turnIndicator.style.backgroundColor = '#4CAF50';
   } else if (myPlayerNumber === 2) {
     turnIndicator.textContent = 'You control the RIGHT side (Player 2). Compete against the left side!';
+    turnIndicator.style.backgroundColor = '#4CAF50';
   } else {
-    turnIndicator.textContent = 'Spectating both players...';
+    turnIndicator.textContent = 'Invalid player number - refresh page';
+    turnIndicator.style.backgroundColor = '#f44336';
   }
-  turnIndicator.style.backgroundColor = '#4CAF50';
 }
 
 // Drop fruit on click for a specific player
@@ -378,25 +404,19 @@ function dropFruit(playerNum) {
 
 // Handle mouse movement for fruit positioning
 function handleMouseMove(event, playerNum) {
-  console.log(`Mouse move on player ${playerNum}, my player is ${myPlayerNumber}`);
-  
   // Only allow movement if this is my assigned player
   if (playerNum !== myPlayerNumber) {
-    console.log(`Ignoring mouse move - not my player`);
     return;
   }
   
   const gameState = gameStates[`player${playerNum}`];
   if (gameState.disableAction || !gameState.currentBody) {
-    console.log(`Cannot move - disabled:${gameState.disableAction}, body:${!!gameState.currentBody}`);
     return;
   }
   
   const canvas = playerNum === 1 ? render1.canvas : render2.canvas;
   const rect = canvas.getBoundingClientRect();
   const x = event.clientX - rect.left;
-  
-  console.log(`Moving fruit to x:${x} for player ${playerNum}`);
   
   if (x - gameState.currentFruit.radius > 30 && x + gameState.currentFruit.radius < 570) {
     Body.setPosition(gameState.currentBody, {
@@ -430,23 +450,51 @@ function handleClick(event, playerNum) {
 
 // Set up event listeners - Player 1 always controls left, Player 2 always controls right
 function setupEventListeners() {
+  if (eventListenersSet) {
+    console.log('Event listeners already set up, skipping...');
+    return;
+  }
+  
   console.log(`Setting up event listeners for player ${myPlayerNumber}`);
   
   if (myPlayerNumber === 1) {
     // Player 1 controls the left canvas (render1)
     console.log('Adding event listeners to left canvas for Player 1');
-    render1.canvas.addEventListener('mousemove', (e) => handleMouseMove(e, 1));
-    render1.canvas.addEventListener('click', (e) => handleClick(e, 1));
+    if (render1 && render1.canvas) {
+      render1.canvas.addEventListener('mousemove', (e) => handleMouseMove(e, 1));
+      render1.canvas.addEventListener('click', (e) => handleClick(e, 1));
+      render1.canvas.style.cursor = 'crosshair';
+      // Set other canvas to default cursor
+      if (render2 && render2.canvas) {
+        render2.canvas.style.cursor = 'default';
+      }
+      console.log('Player 1 controls added to left canvas');
+    } else {
+      console.error('Left canvas not available for Player 1');
+    }
   } else if (myPlayerNumber === 2) {
     // Player 2 controls the right canvas (render2)
     console.log('Adding event listeners to right canvas for Player 2');
-    render2.canvas.addEventListener('mousemove', (e) => handleMouseMove(e, 2));
-    render2.canvas.addEventListener('click', (e) => handleClick(e, 2));
+    if (render2 && render2.canvas) {
+      render2.canvas.addEventListener('mousemove', (e) => handleMouseMove(e, 2));
+      render2.canvas.addEventListener('click', (e) => handleClick(e, 2));
+      render2.canvas.style.cursor = 'crosshair';
+      // Set other canvas to default cursor
+      if (render1 && render1.canvas) {
+        render1.canvas.style.cursor = 'default';
+      }
+      console.log('Player 2 controls added to right canvas');
+    } else {
+      console.error('Right canvas not available for Player 2');
+    }
   }
   
   // Test both canvases exist
-  console.log('Left canvas exists:', !!render1.canvas);
-  console.log('Right canvas exists:', !!render2.canvas);
+  console.log('Left canvas exists:', !!render1?.canvas);
+  console.log('Right canvas exists:', !!render2?.canvas);
+  console.log('Event listeners set up for player:', myPlayerNumber);
+  
+  eventListenersSet = true;
 }
 
 function setupCollisionDetection() {
@@ -538,10 +586,15 @@ function setupSocketEvents() {
     if (myPlayerNumber === 1 && player1Score) {
       player1Score.style.backgroundColor = '#4CAF50';
       player1Score.style.color = 'white';
+      player1Score.textContent = 'Player 1 (YOU): 0';
     } else if (myPlayerNumber === 2 && player2Score) {
       player2Score.style.backgroundColor = '#4CAF50';
       player2Score.style.color = 'white';
+      player2Score.textContent = 'Player 2 (YOU): 0';
     }
+    
+    // Update turn indicator immediately
+    updateTurnIndicator();
   });
 
   socket.on('gameStart', (data) => {
@@ -554,32 +607,65 @@ function setupSocketEvents() {
     
     console.log(`Game starting, I am player ${myPlayerNumber}`);
     
-    // Set up event listeners for my assigned player (with delay to ensure player number is set)
+    // Set up event listeners for my assigned player
     setTimeout(() => {
       setupEventListeners();
       
-      // Each player generates their own fruit
-      const myFruitIndex = Math.floor(Math.random() * 5);
-      
-      // Send my fruit to server for synchronization
-      socket.emit('initializeMyFruit', { 
-        roomId, 
-        playerNumber: myPlayerNumber,
-        fruitIndex: myFruitIndex
-      });
-      
-      // Add my fruit locally to my game area
-      addFruitWithIndex(myPlayerNumber, myFruitIndex);
-    }, 200); // Longer delay to ensure everything is ready
+      // Only generate fruit if I'm a valid player (1 or 2)
+      if (myPlayerNumber === 1 || myPlayerNumber === 2) {
+        // Each player generates their own fruit
+        const myFruitIndex = Math.floor(Math.random() * 5);
+        
+        // Send my fruit to server for synchronization
+        socket.emit('initializeMyFruit', { 
+          roomId, 
+          playerNumber: myPlayerNumber,
+          fruitIndex: myFruitIndex
+        });
+        
+        // Add my fruit locally to my game area
+        addFruitWithIndex(myPlayerNumber, myFruitIndex);
+        console.log(`Generated initial fruit for player ${myPlayerNumber}`);
+      }
+    }, 200);
     
     updateTurnIndicator();
   });
+  
+  // Handle waiting for players
+  socket.on('waitingForPlayers', (data) => {
+    console.log('Waiting for players:', data);
+    if (connectionStatus) {
+      connectionStatus.textContent = `Waiting for players (${data.currentPlayers}/${data.requiredPlayers})`;
+      connectionStatus.style.backgroundColor = '#FF9800';
+    }
+    if (turnIndicator) {
+      turnIndicator.textContent = 'Waiting for another player to join...';
+      turnIndicator.style.backgroundColor = '#FF9800';
+    }
+  });
+  
+  // Handle room full
+  socket.on('roomFull', (data) => {
+    console.log('Room is full:', data);
+    if (connectionStatus) {
+      connectionStatus.textContent = 'Room is full - try another room';
+      connectionStatus.style.backgroundColor = '#f44336';
+    }
+  });
 
 socket.on('scoreUpdate', (scores) => {
-  gameState.player1Score = scores.player1Score || 0;
-  gameState.player2Score = scores.player2Score || 0;
-  player1Score.textContent = `Player 1: ${gameState.player1Score}`;
-  player2Score.textContent = `Player 2: ${gameState.player2Score}`;
+  gameStates.player1.score = scores.player1Score || 0;
+  gameStates.player2.score = scores.player2Score || 0;
+  
+  if (player1Score) {
+    const player1Text = myPlayerNumber === 1 ? 'Player 1 (YOU)' : 'Player 1';
+    player1Score.textContent = `${player1Text}: ${gameStates.player1.score}`;
+  }
+  if (player2Score) {
+    const player2Text = myPlayerNumber === 2 ? 'Player 2 (YOU)' : 'Player 2';
+    player2Score.textContent = `${player2Text}: ${gameStates.player2.score}`;
+  }
 });
 
 // Handle opponent fruit movement
@@ -623,6 +709,17 @@ socket.on('newFruit', (data) => {
   }
 });
 
+socket.on('playerLeft', (data) => {
+  console.log('Player left:', data);
+  if (connectionStatus) {
+    connectionStatus.textContent = 'Opponent disconnected - waiting for new player...';
+    connectionStatus.style.backgroundColor = '#FF9800';
+  }
+  gameStarted = false;
+  eventListenersSet = false; // Allow event listeners to be set again
+  updateTurnIndicator();
+});
+
 // Removed game end handler - games continue indefinitely
 
   socket.on('playerLeft', (playerId) => {
@@ -637,6 +734,12 @@ function setupJoinGameButton() {
   console.log('Setting up join game button...');
   console.log('joinGameBtn exists:', !!joinGameBtn);
   console.log('roomIdInput exists:', !!roomIdInput);
+  
+  // Safety check for render objects
+  if (!render1 || !render2) {
+    console.error('Render objects not initialized, skipping button setup');
+    return;
+  }
   
   // Try multiple ways to find the button
   if (!joinGameBtn) {
@@ -714,6 +817,23 @@ function setupJoinGameButton() {
       connectionStatus.textContent = 'Connecting to server...';
       connectionStatus.style.backgroundColor = '#ffeb3b';
     }
+  }
+  
+  // Setup New Room button
+  const newRoomBtn = document.getElementById('new-room');
+  if (newRoomBtn) {
+    newRoomBtn.addEventListener('click', () => {
+      const newRoomId = `room_${Date.now()}`;
+      roomIdInput.value = newRoomId;
+      roomId = newRoomId;
+      console.log('Generated new room ID:', newRoomId);
+      
+      if (connectionStatus) {
+        connectionStatus.textContent = `New room created: ${newRoomId}`;
+        connectionStatus.style.backgroundColor = '#2196F3';
+      }
+    });
+    console.log('New room button setup complete');
   }
   
   // Test server connection

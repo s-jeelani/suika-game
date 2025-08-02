@@ -101,7 +101,7 @@ canvas {
   margin-top: 20px;
 }
 
-#join-game {
+#join-game, #new-room {
   padding: 10px 20px;
   font-size: 16px;
   background-color: #4CAF50;
@@ -113,6 +113,10 @@ canvas {
   pointer-events: auto;
   z-index: 1000;
   position: relative;
+}
+
+#new-room {
+  background-color: #FF9800;
 }
 
 #join-game:hover {
