@@ -71,22 +71,7 @@ body {
     font-weight: 600;
 }
 
-#main-next-fruit {
-    background: #F5F5DC;
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid #D2B48C;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
 
-#main-next-fruit img {
-    width: 25px;
-    height: 25px;
-    vertical-align: middle;
-}
 
 #main-canvas {
     flex: 1;

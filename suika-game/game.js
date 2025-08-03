@@ -30,7 +30,6 @@ const gameStates = {};
 // DOM elements
 let mainPlayerName = null;
 let mainScore = null;
-let mainNextFruit = null;
 let mainCanvas = null;
 let viewersContainer = null;
 let winModal = null;
@@ -41,7 +40,6 @@ let loadingMessage = null;
 function initializeDOMElements() {
   mainPlayerName = document.getElementById('main-player-name');
   mainScore = document.getElementById('main-score');
-  mainNextFruit = document.getElementById('main-next-fruit');
   mainCanvas = document.getElementById('main-canvas');
   viewersContainer = document.getElementById('viewers-container');
   winModal = document.getElementById('win-modal');
@@ -121,7 +119,7 @@ function createPlayerRender(playerNum, canvas) {
     engine: engines[playerNum],
     canvas: canvas,
     options: {
-      wireframes: true,          // Force wireframe mode to see outlines
+      wireframes: false,         // Back to normal mode now that we confirmed rendering works
       background: "#F7f4C8",
       width: canvas.width,
       height: canvas.height,
@@ -157,30 +155,17 @@ function addFruitToPlayer(playerNum, fruitIndex) {
   
   console.log(`Adding fruit ${fruit.name} to player ${playerNum} at position ${centerX}, 50`);
   
-  // TODO: Once sprites work, uncomment this and comment out the red circle
-  // const body = Bodies.circle(centerX, 50, fruit.radius, {
-  //   index: fruitIndex,
-  //   isSleeping: true,
-  //   render: {
-  //     sprite: { 
-  //       texture: `/public/${fruit.name}.png`,  // Try this path first
-  //       xScale: 1,
-  //       yScale: 1
-  //     }
-  //   },
-  //   restitution: 0.2,
-  //   density: 0.001,
-  //   friction: 0.3,
-  //   frictionAir: 0.01,
-  //   isDropped: false
-  // });
-
-  // For now, use bright red circles so we can see if rendering works at all
+  // Try sprite rendering - rendering works so now test sprite paths
   const body = Bodies.circle(centerX, 50, fruit.radius, {
     index: fruitIndex,
     isSleeping: true,
     render: {
-      fillStyle: '#e74c3c'    // Bright red - easy to see
+      sprite: { 
+        texture: `/${fruit.name}.png`,  // Try the root path first
+        xScale: 1,
+        yScale: 1
+      },
+      fillStyle: '#e74c3c'    // Fallback color if sprite fails
     },
     restitution: 0.2,
     density: 0.001,
@@ -381,8 +366,8 @@ function updateMiniViewer(playerNum) {
     statusElement.className = `mini-viewer-status ${gameState.disableAction ? 'waiting' : 'playing'}`;
   }
   
-  // Update next fruit display in mini viewer if it's the current view
-  if (gameState.currentView === playerNum && gameState.nextFruit) {
+  // Update main game controls if this is the current view (for real-time updates)
+  if (gameState.currentView === playerNum) {
     updateMainGameControls(playerNum);
   }
 }
@@ -400,17 +385,22 @@ function switchToPlayerView(playerNum) {
     mainCanvas.width = 800;
     mainCanvas.height = 600;
     
-    // Stop old render and create a brand new one for main canvas
-    const oldRender = renders[playerNum];
-    if (oldRender) {
-      Render.stop(oldRender);             // Stop & clear the old one
-      oldRender.canvas = null;
+    // Instead of recreating, just redirect the existing render to main canvas
+    const render = renders[playerNum];
+    if (render) {
+      // Stop rendering on the mini canvas
+      Render.stop(render);
+      
+      // Update render to use main canvas
+      render.canvas = mainCanvas;
+      render.options.width = mainCanvas.width;
+      render.options.height = mainCanvas.height;
+      
+      // Restart rendering on main canvas
+      Render.run(render);
+      
+      console.log(`Redirected render for player ${playerNum} to main canvas ${mainCanvas.width}x${mainCanvas.height}`);
     }
-    
-    // Create brand-new render for main canvas
-    createPlayerRender(playerNum, mainCanvas);
-    
-    console.log(`Created new render for player ${playerNum} on main canvas ${mainCanvas.width}x${mainCanvas.height}`);
   }
   
   // Update UI
@@ -423,7 +413,13 @@ function switchToPlayerView(playerNum) {
   document.querySelectorAll('.mini-viewer').forEach(viewer => {
     viewer.classList.remove('active');
   });
-  document.getElementById(`viewer-${playerNum}`).classList.add('active');
+  const activeViewer = document.getElementById(`viewer-${playerNum}`);
+  if (activeViewer) {
+    activeViewer.classList.add('active');
+    console.log(`Set active highlight on viewer-${playerNum}`);
+  } else {
+    console.error(`Could not find viewer-${playerNum} to highlight`);
+  }
   
   // Update controls
   updateMainGameControls(playerNum);
@@ -442,16 +438,6 @@ function updateMainGameControls(playerNum) {
   if (!gameState) return;
   
   mainScore.textContent = `Score: ${gameState.score}`;
-  
-  if (gameState.nextFruit) {
-    // Create next fruit display with actual PNG
-    const nextFruitContainer = document.getElementById('main-next-fruit');
-    nextFruitContainer.innerHTML = `
-      <span>Next:</span>
-      <img src="/${gameState.nextFruit.name}.png" alt="${gameState.nextFruit.name}" 
-           style="width: 30px; height: 30px; vertical-align: middle; margin-left: 5px;">
-    `;
-  }
 }
 
 // Get fruit emoji
@@ -742,20 +728,24 @@ function setupSocketEvents() {
 
 // Test sprite loading
 function testSpriteLoading() {
-  console.log('Testing sprite loading...');
+  console.log('🔍 Testing sprite loading paths...');
   
   // Test different possible paths
   const testPaths = [
     '/00_cherry.png',
     '/public/00_cherry.png', 
     './public/00_cherry.png',
-    'public/00_cherry.png'
+    'public/00_cherry.png',
+    './00_cherry.png'
   ];
   
-  testPaths.forEach(path => {
+  testPaths.forEach((path, index) => {
     const testImg = new Image();
-    testImg.onload = () => console.log('✅ Sprite loaded successfully:', path);
-    testImg.onerror = () => console.error('❌ Failed to load sprite:', path);
+    testImg.onload = () => {
+      console.log(`✅ SUCCESS: Sprite loaded at path:`, path);
+      console.log(`🎯 USE THIS PATH: "${path}" for textures`);
+    };
+    testImg.onerror = () => console.log(`❌ Failed: ${path}`);
     testImg.src = path;
   });
 }
