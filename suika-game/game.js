@@ -121,7 +121,7 @@ function createPlayerRender(playerNum, canvas) {
     engine: engines[playerNum],
     canvas: canvas,
     options: {
-      wireframes: false,
+      wireframes: true,          // Force wireframe mode to see outlines
       background: "#F7f4C8",
       width: canvas.width,
       height: canvas.height,
@@ -157,15 +157,30 @@ function addFruitToPlayer(playerNum, fruitIndex) {
   
   console.log(`Adding fruit ${fruit.name} to player ${playerNum} at position ${centerX}, 50`);
   
+  // TODO: Once sprites work, uncomment this and comment out the red circle
+  // const body = Bodies.circle(centerX, 50, fruit.radius, {
+  //   index: fruitIndex,
+  //   isSleeping: true,
+  //   render: {
+  //     sprite: { 
+  //       texture: `/public/${fruit.name}.png`,  // Try this path first
+  //       xScale: 1,
+  //       yScale: 1
+  //     }
+  //   },
+  //   restitution: 0.2,
+  //   density: 0.001,
+  //   friction: 0.3,
+  //   frictionAir: 0.01,
+  //   isDropped: false
+  // });
+
+  // For now, use bright red circles so we can see if rendering works at all
   const body = Bodies.circle(centerX, 50, fruit.radius, {
     index: fruitIndex,
     isSleeping: true,
     render: {
-      sprite: { 
-        texture: `/${fruit.name}.png`,
-        xScale: 1,
-        yScale: 1
-      }
+      fillStyle: '#e74c3c'    // Bright red - easy to see
     },
     restitution: 0.2,
     density: 0.001,
@@ -385,18 +400,17 @@ function switchToPlayerView(playerNum) {
     mainCanvas.width = 800;
     mainCanvas.height = 600;
     
-    // Copy the render to main canvas and update render options
-    const render = renders[playerNum];
-    if (render) {
-      render.canvas = mainCanvas;
-      render.options.width = mainCanvas.width;
-      render.options.height = mainCanvas.height;
-      
-      // Force a render update
-      Render.setPixelRatio(render, 'auto');
-      
-      console.log(`Updated render for player ${playerNum} to main canvas ${mainCanvas.width}x${mainCanvas.height}`);
+    // Stop old render and create a brand new one for main canvas
+    const oldRender = renders[playerNum];
+    if (oldRender) {
+      Render.stop(oldRender);             // Stop & clear the old one
+      oldRender.canvas = null;
     }
+    
+    // Create brand-new render for main canvas
+    createPlayerRender(playerNum, mainCanvas);
+    
+    console.log(`Created new render for player ${playerNum} on main canvas ${mainCanvas.width}x${mainCanvas.height}`);
   }
   
   // Update UI
@@ -728,10 +742,22 @@ function setupSocketEvents() {
 
 // Test sprite loading
 function testSpriteLoading() {
-  const testImg = new Image();
-  testImg.onload = () => console.log('Sprite loaded successfully:', testImg.src);
-  testImg.onerror = () => console.error('Failed to load sprite:', testImg.src);
-  testImg.src = '/00_cherry.png';
+  console.log('Testing sprite loading...');
+  
+  // Test different possible paths
+  const testPaths = [
+    '/00_cherry.png',
+    '/public/00_cherry.png', 
+    './public/00_cherry.png',
+    'public/00_cherry.png'
+  ];
+  
+  testPaths.forEach(path => {
+    const testImg = new Image();
+    testImg.onload = () => console.log('✅ Sprite loaded successfully:', path);
+    testImg.onerror = () => console.error('❌ Failed to load sprite:', path);
+    testImg.src = path;
+  });
 }
 
 // Initialize everything
