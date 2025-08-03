@@ -93,6 +93,8 @@ function initializePlayerEngine(playerNum, canvasWidth = 600, canvasHeight = 400
 
 // Initialize world with walls
 function initializeWorld(world, canvasWidth = 600, canvasHeight = 400) {
+  console.log(`Initializing world with dimensions: ${canvasWidth}x${canvasHeight}`);
+  
   const leftWall = Bodies.rectangle(15, canvasHeight/2, 30, canvasHeight, {
     isStatic: true,
     render: { fillStyle: '#E6B143'}
@@ -116,15 +118,12 @@ function initializeWorld(world, canvasWidth = 600, canvasHeight = 400) {
   });
 
   World.add(world, [leftWall, rightWall, groundWall, topLine]);
+  console.log(`World initialized with walls at positions: left(15), right(${canvasWidth-15}), ground(${canvasHeight-30}), top(150)`);
 }
 
 // Create render for a player
 function createPlayerRender(playerNum, canvas) {
-  // Determine scale based on canvas size (mini viewers get more zoomed out)
-  const isMiniViewer = canvas.width < 500;
-  const scale = isMiniViewer ? 0.6 : 1.0; // Use 1.0 for main canvas, 0.6 for mini viewers
-  
-  console.log(`Creating render for player ${playerNum}: canvas=${canvas.width}x${canvas.height}, isMiniViewer=${isMiniViewer}`);
+  console.log(`Creating render for player ${playerNum}: canvas=${canvas.width}x${canvas.height}`);
   
   const render = Render.create({
     engine: engines[playerNum],
@@ -134,7 +133,9 @@ function createPlayerRender(playerNum, canvas) {
       background: "#F7f4C8",
       width: canvas.width,
       height: canvas.height,
-      pixelRatio: 'auto'
+      pixelRatio: 'auto',
+      showDebug: false,
+      hasBounds: false
     }
   });
   
@@ -143,6 +144,15 @@ function createPlayerRender(playerNum, canvas) {
   Runner.run(engines[playerNum]);
   
   console.log(`Render created for player ${playerNum} with canvas size ${canvas.width}x${canvas.height}`);
+  
+  // Debug: Check if bodies are being rendered
+  setTimeout(() => {
+    const world = engines[playerNum].world;
+    console.log(`Player ${playerNum} world has ${world.bodies.length} bodies after render creation`);
+    world.bodies.forEach((body, index) => {
+      console.log(`Body ${index}: position(${body.position.x}, ${body.position.y}), render:`, body.render);
+    });
+  }, 1000);
 }
 
 // Add fruit to a player's game
@@ -152,11 +162,19 @@ function addFruitToPlayer(playerNum, fruitIndex) {
   
   const fruit = FRUITS[fruitIndex];
   const centerX = gameState.canvasWidth / 2;
+  
+  console.log(`Adding fruit ${fruit.name} to player ${playerNum} at position ${centerX}, 50`);
+  
   const body = Bodies.circle(centerX, 50, fruit.radius, {
     index: fruitIndex,
     isSleeping: true,
     render: {
-      sprite: { texture: `/${fruit.name}.png` }
+      fillStyle: '#FF0000', // Red color for debugging
+      sprite: { 
+        texture: `/${fruit.name}.png`,
+        xScale: 1,
+        yScale: 1
+      }
     },
     restitution: 0.2,
     density: 0.001,
@@ -175,6 +193,7 @@ function addFruitToPlayer(playerNum, fruitIndex) {
   World.add(gameState.world, body);
   
   console.log(`Fruit added to player ${playerNum}: ${fruit.name} at position ${centerX}, 50`);
+  console.log(`World now has ${gameState.world.bodies.length} bodies`);
 }
 
 // Drop fruit for a player
@@ -326,8 +345,9 @@ function createMiniViewer(playerNum, playerData) {
   
   viewersContainer.appendChild(viewerDiv);
   
-  // Initialize physics for this player with canvas dimensions
-  initializePlayerEngine(playerNum, canvas.width, canvas.height);
+  // Initialize physics for this player with main canvas dimensions (600x400)
+  // This ensures consistent world coordinates across all players
+  initializePlayerEngine(playerNum, 600, 400);
   createPlayerRender(playerNum, canvas);
   
   // Add click handler to switch view
@@ -354,6 +374,11 @@ function updateMiniViewer(playerNum) {
     statusElement.textContent = gameState.disableAction ? 'Dropping...' : 'Playing';
     statusElement.className = `mini-viewer-status ${gameState.disableAction ? 'waiting' : 'playing'}`;
   }
+  
+  // Update next fruit display in mini viewer if it's the current view
+  if (gameState.currentView === playerNum && gameState.nextFruit) {
+    updateMainGameControls(playerNum);
+  }
 }
 
 // Switch to player view
@@ -365,14 +390,9 @@ function switchToPlayerView(playerNum) {
   // Update main canvas to show this player's game
   const targetCanvas = document.getElementById(`canvas-${playerNum}`);
   if (targetCanvas) {
-    // Set main canvas size based on whether it's the main player or mini viewer
-    if (playerNum === gameState.playerNumber) {
-      mainCanvas.width = 600;
-      mainCanvas.height = 400;
-    } else {
-      mainCanvas.width = targetCanvas.width;
-      mainCanvas.height = targetCanvas.height;
-    }
+    // Always use the main canvas size for consistent display
+    mainCanvas.width = 600;
+    mainCanvas.height = 400;
     
     // Copy the render to main canvas and update render options
     const render = renders[playerNum];
@@ -380,6 +400,11 @@ function switchToPlayerView(playerNum) {
       render.canvas = mainCanvas;
       render.options.width = mainCanvas.width;
       render.options.height = mainCanvas.height;
+      
+      // Force a render update
+      Render.setPixelRatio(render, 'auto');
+      
+      console.log(`Updated render for player ${playerNum} to main canvas ${mainCanvas.width}x${mainCanvas.height}`);
     }
   }
   
@@ -403,8 +428,8 @@ function switchToPlayerView(playerNum) {
   const isViewingOwnGame = playerNum === gameState.playerNumber;
   mainCanvas.style.cursor = isViewingOwnGame ? 'crosshair' : 'default';
   
-  // Store the current view for event handlers
-  gameState.currentView = playerNum;
+  // Debug: Log canvas state
+  console.log(`Switched to player ${playerNum} view. Canvas size: ${mainCanvas.width}x${mainCanvas.height}`);
 }
 
 // Update main game controls
@@ -415,7 +440,13 @@ function updateMainGameControls(playerNum) {
   mainScore.textContent = `Score: ${gameState.score}`;
   
   if (gameState.nextFruit) {
-    mainNextFruit.textContent = `Next: ${getFruitEmoji(gameState.nextFruit.index)}`;
+    // Create next fruit display with actual PNG
+    const nextFruitContainer = document.getElementById('main-next-fruit');
+    nextFruitContainer.innerHTML = `
+      <span>Next:</span>
+      <img src="/${gameState.nextFruit.name}.png" alt="${gameState.nextFruit.name}" 
+           style="width: 30px; height: 30px; vertical-align: middle; margin-left: 5px;">
+    `;
   }
 }
 
@@ -567,22 +598,22 @@ function handleMouseMove(event, playerNum) {
   // Convert screen coordinates to world coordinates
   const worldX = (x / rect.width) * gameState.canvasWidth;
   
-  console.log(`Mouse move: screenX=${x}, rect.width=${rect.width}, canvasWidth=${gameState.canvasWidth}, worldX=${worldX}`);
+  // Clamp the position within the game boundaries
+  const clampedX = Math.max(30 + gameState.currentFruit.radius, 
+                           Math.min(worldX, gameState.canvasWidth - 30 - gameState.currentFruit.radius));
   
-  if (worldX - gameState.currentFruit.radius > 30 && worldX + gameState.currentFruit.radius < gameState.canvasWidth - 30) {
-    Body.setPosition(gameState.currentBody, {
-      x: worldX,
-      y: gameState.currentBody.position.y
-    });
-    
-    // Send position update
-    socket.emit('fruitMove', {
-      roomId: gameState.roomId,
-      playerNumber: playerNum,
-      x: worldX,
-      y: gameState.currentBody.position.y
-    });
-  }
+  Body.setPosition(gameState.currentBody, {
+    x: clampedX,
+    y: gameState.currentBody.position.y
+  });
+  
+  // Send position update
+  socket.emit('fruitMove', {
+    roomId: gameState.roomId,
+    playerNumber: playerNum,
+    x: clampedX,
+    y: gameState.currentBody.position.y
+  });
 }
 
 // Set up socket events
@@ -639,8 +670,9 @@ function setupSocketEvents() {
     // Start game
     gameState.gameStarted = true;
     
-    // Set initial view to your own game
+    // Set initial view to your own game and add initial fruit
     switchToPlayerView(gameState.playerNumber);
+    addFruitToPlayer(gameState.playerNumber, Math.floor(Math.random() * 5));
   });
   
   socket.on('playerJoined', (data) => {
@@ -704,6 +736,14 @@ function setupSocketEvents() {
   });
 }
 
+// Test sprite loading
+function testSpriteLoading() {
+  const testImg = new Image();
+  testImg.onload = () => console.log('Sprite loaded successfully:', testImg.src);
+  testImg.onerror = () => console.error('Failed to load sprite:', testImg.src);
+  testImg.src = '/00_cherry.png';
+}
+
 // Initialize everything
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
@@ -711,10 +751,12 @@ if (document.readyState === 'loading') {
     initializeDOMElements();
     setupEventListeners();
     setupSocketEvents();
+    testSpriteLoading();
   });
 } else {
   console.log('DOM already loaded, initializing game...');
   initializeDOMElements();
   setupEventListeners();
   setupSocketEvents();
+  testSpriteLoading();
 } 
