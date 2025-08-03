@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Names Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .player-box {
+            border: 2px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .player-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .player-number {
+            color: #666;
+            font-size: 0.9em;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .debug-info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Player Names Debug Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Set Player Nickname</h2>
+        <input type="text" id="nickname-input" placeholder="Enter nickname">
+        <button onclick="setNickname()">Set Nickname</button>
+        <div class="debug-info" id="nickname-debug"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Simulate Game Data</h2>
+        <button onclick="simulatePlayer1()">Simulate Player 1</button>
+        <button onclick="simulatePlayer2()">Simulate Player 2</button>
+        <button onclick="clearData()">Clear All Data</button>
+        <div class="debug-info" id="game-data-debug"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Mini Viewer Simulation</h2>
+        <div id="mini-viewers"></div>
+    </div>
+
+    <script>
+        // Simulate the game state
+        let gameState = {
+            playerNumber: null,
+            players: [],
+            playerNickname: ''
+        };
+
+        function setNickname() {
+            const nickname = document.getElementById('nickname-input').value.trim();
+            if (nickname) {
+                localStorage.setItem('suika-player-nickname', nickname);
+                gameState.playerNickname = nickname;
+                updateDebugInfo();
+            }
+        }
+
+        function simulatePlayer1() {
+            // Simulate player 1 data
+            const playerData = {
+                playerNumber: 1,
+                players: [
+                    { number: 1, nickname: 'Alice', isHost: true },
+                    { number: 2, nickname: 'Bob', isHost: false }
+                ]
+            };
+            simulateGameJoin(playerData);
+        }
+
+        function simulatePlayer2() {
+            // Simulate player 2 data
+            const playerData = {
+                playerNumber: 2,
+                players: [
+                    { number: 1, nickname: 'Alice', isHost: true },
+                    { number: 2, nickname: 'Bob', isHost: false }
+                ]
+            };
+            simulateGameJoin(playerData);
+        }
+
+        function simulateGameJoin(data) {
+            gameState.playerNumber = data.playerNumber;
+            gameState.players = data.players;
+            
+            // Simulate what happens in game.js
+            console.log('Simulating game join:', data);
+            console.log('Player data received:', data.players);
+            
+            // Create mini viewers
+            const sortedPlayers = [...data.players].sort((pA, pB) => {
+                if (pA.number === data.playerNumber) return -1;
+                if (pB.number === data.playerNumber) return 1;
+                return pA.number - pB.number;
+            });
+
+            console.log('Creating mini viewers for sorted players:', sortedPlayers);
+            createMiniViewers(sortedPlayers);
+            updateDebugInfo();
+        }
+
+        function createMiniViewers(players) {
+            const container = document.getElementById('mini-viewers');
+            container.innerHTML = '';
+            
+            players.forEach(player => {
+                console.log(`Creating mini viewer for player ${player.number} (${player.nickname})`);
+                
+                const viewerDiv = document.createElement('div');
+                viewerDiv.className = 'player-box';
+                viewerDiv.innerHTML = `
+                    <div class="player-name">${player.nickname}</div>
+                    <div class="player-number">Player ${player.number}</div>
+                    <div>Score: 0</div>
+                    <div>Status: Waiting...</div>
+                `;
+                
+                container.appendChild(viewerDiv);
+            });
+        }
+
+        function clearData() {
+            localStorage.removeItem('suika-player-nickname');
+            localStorage.removeItem('suika-room-id');
+            gameState = {
+                playerNumber: null,
+                players: [],
+                playerNickname: ''
+            };
+            document.getElementById('mini-viewers').innerHTML = '';
+            updateDebugInfo();
+        }
+
+        function updateDebugInfo() {
+            const nickname = localStorage.getItem('suika-player-nickname');
+            const roomId = localStorage.getItem('suika-room-id');
+            
+            document.getElementById('nickname-debug').innerHTML = `
+                <strong>localStorage:</strong><br>
+                suika-player-nickname: "${nickname || 'not set'}"<br>
+                suika-room-id: "${roomId || 'not set'}"<br><br>
+                <strong>gameState:</strong><br>
+                playerNumber: ${gameState.playerNumber || 'null'}<br>
+                playerNickname: "${gameState.playerNickname}"<br>
+                players count: ${gameState.players.length}
+            `;
+            
+            document.getElementById('game-data-debug').innerHTML = `
+                <strong>Current Game State:</strong><br>
+                ${JSON.stringify(gameState, null, 2)}
+            `;
+        }
+
+        // Initialize
+        updateDebugInfo();
+    </script>
+</body>
+</html> 

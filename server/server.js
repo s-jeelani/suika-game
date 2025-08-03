@@ -319,6 +319,7 @@ io.on('connection', (socket) => {
     gameRooms.set(roomId, room);
     playerScores.set(socket.id, 0);
     playerProfiles.set(socket.id, { nickname: hostNickname, isReady: true });
+    console.log(`DEBUG: Host "${hostNickname}" created room ${roomId}`);
     
     socket.join(roomId);
     
@@ -389,10 +390,22 @@ io.on('connection', (socket) => {
     // Add player to room
     room.players.push(socket.id);
     playerScores.set(socket.id, 0);
-    playerProfiles.set(socket.id, { nickname, isReady: true });
+    
+    // Check if nickname is already taken in this room
+    const existingNicknames = room.players.map(id => playerProfiles.get(id)?.nickname).filter(Boolean);
+    let uniqueNickname = nickname;
+    let counter = 1;
+    while (existingNicknames.includes(uniqueNickname)) {
+      uniqueNickname = `${nickname}${counter}`;
+      counter++;
+    }
+    
+    playerProfiles.set(socket.id, { nickname: uniqueNickname, isReady: true });
+    console.log(`DEBUG: Assigned unique nickname "${uniqueNickname}" to player ${socket.id} (original: "${nickname}")`);
     
     console.log(`DEBUG: Stored profile for ${socket.id}:`, playerProfiles.get(socket.id));
-    console.log(`DEBUG: All profiles:`, Array.from(playerProfiles.entries()));
+    console.log(`DEBUG: All profiles after adding ${nickname}:`, Array.from(playerProfiles.entries()));
+    console.log(`DEBUG: Room ${roomCode} now has players:`, room.players.map(id => ({ id, nickname: playerProfiles.get(id)?.nickname })));
     
     const playerNumber = room.players.length;
     console.log(`Player ${nickname} joined as player ${playerNumber}. Room now has ${room.players.length} players.`);
@@ -536,7 +549,8 @@ io.on('connection', (socket) => {
         if (playerIndex !== -1) {
           // Update the player's socket ID to the new connection
           room.players[playerIndex] = socket.id;
-          playerProfiles.set(socket.id, playerProfiles.get(oldSocketId));
+          const oldProfile = playerProfiles.get(oldSocketId);
+          playerProfiles.set(socket.id, oldProfile);
           playerProfiles.delete(oldSocketId);
           console.log(`Updated socket ID for reconnecting player ${nickname}: ${oldSocketId} -> ${socket.id}`);
         }
@@ -544,7 +558,21 @@ io.on('connection', (socket) => {
     } else {
       console.log(`Player ${socket.id} found directly in room at index ${playerIndex}`);
       // Update their profile with the provided nickname (in case it changed)
-      playerProfiles.set(socket.id, { nickname, isReady: true });
+      // Check if nickname is already taken by another player in this room
+      const existingNicknames = room.players.map(id => {
+        if (id === socket.id) return null; // Skip current player
+        return playerProfiles.get(id)?.nickname;
+      }).filter(Boolean);
+      
+      let uniqueNickname = nickname;
+      let counter = 1;
+      while (existingNicknames.includes(uniqueNickname)) {
+        uniqueNickname = `${nickname}${counter}`;
+        counter++;
+      }
+      
+      playerProfiles.set(socket.id, { nickname: uniqueNickname, isReady: true });
+      console.log(`DEBUG: Updated nickname for existing player ${socket.id} to "${uniqueNickname}" (original: "${nickname}")`);
     }
     
     if (playerIndex === -1) {
@@ -561,6 +589,7 @@ io.on('connection', (socket) => {
     const players = room.players.map((playerId, index) => {
       const profile = playerProfiles.get(playerId);
       console.log(`DEBUG: Getting profile for ${playerId} (player ${index + 1}):`, profile);
+      console.log(`DEBUG: All player profiles at this moment:`, Array.from(playerProfiles.entries()));
       return {
         id: playerId,
         number: index + 1,

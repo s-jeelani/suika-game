@@ -323,6 +323,7 @@ function createMiniViewer(playerNum, playerData) {
   viewerDiv.id = `viewer-${playerNum}`;
   
   // Build the viewer HTML (including the canvas that will actually be in the DOM)
+  console.log(`Creating mini viewer for player ${playerNum} with data:`, playerData);
   viewerDiv.innerHTML = `
     <div class="mini-viewer-header">
       <div class="mini-viewer-name">${playerData.nickname}</div>
@@ -811,6 +812,8 @@ function setupSocketEvents() {
     const roomId = localStorage.getItem('suika-room-id');
     const nickname = localStorage.getItem('suika-player-nickname');
     
+    console.log('Retrieved from localStorage - roomId:', roomId, 'nickname:', nickname);
+    
     if (roomId && nickname) {
       gameState.roomId = roomId;
       gameState.playerNickname = nickname;
@@ -830,6 +833,7 @@ function setupSocketEvents() {
   // Game events
   socket.on('gameJoined', (data) => {
     console.log('Joined game:', data);
+    console.log('Player data received:', data.players);
     gameState.playerNumber = data.playerNumber;
     gameState.players = data.players;
     gameState.maxPlayers = data.maxPlayers;
@@ -853,7 +857,11 @@ function setupSocketEvents() {
       return pA.number - pB.number; // keep deterministic order for remaining
     });
 
+    console.log('Creating mini viewers for sorted players:', sortedPlayers);
+    console.log('Current player number:', data.playerNumber);
+    console.log('Current player nickname from localStorage:', gameState.playerNickname);
     sortedPlayers.forEach(player => {
+        console.log(`Creating mini viewer for player ${player.number} (${player.nickname})`);
         createMiniViewer(player.number, player);
     });
     
