@@ -17,7 +17,7 @@ let gameState = {
   playerNumber: null,
   maxPlayers: 4,
   players: [],
-  currentView: 'main', // 'main' or player number
+  currentView: null, // Initialize as null instead of 'main'
   gameStarted: false,
   gameOver: false
 };
@@ -25,6 +25,7 @@ let gameState = {
 // Physics engines for each player
 const engines = {};
 const renders = {};
+const runners = {}; // Add runners to track engine updates
 const gameStates = {};
 
 // Debouncing for updateMiniViewer to prevent recursion
@@ -80,6 +81,17 @@ function initializeDOMElements() {
 
 // Initialize physics engine for a player
 function initializePlayerEngine(playerNum, canvasWidth = 400, canvasHeight = 600) {
+  // If engine already exists, clean it up first
+  if (engines[playerNum]) {
+    const runner = runners[playerNum];
+    if (runner) {
+      Runner.stop(runner);
+      delete runners[playerNum];
+    }
+    World.clear(engines[playerNum].world);
+    Engine.clear(engines[playerNum]);
+  }
+
   const engine = Engine.create();
   engine.world.gravity.y = 1;
   engine.world.gravity.scale = 0.001;
@@ -88,6 +100,12 @@ function initializePlayerEngine(playerNum, canvasWidth = 400, canvasHeight = 600
   engine.velocityIterations = 4;
   
   engines[playerNum] = engine;
+  
+  // Create and store a new runner for this engine
+  const runner = Runner.create();
+  runners[playerNum] = runner;
+  Runner.run(runner, engine);
+  
   gameStates[playerNum] = {
     engine: engine,
     world: engine.world,
@@ -104,9 +122,6 @@ function initializePlayerEngine(playerNum, canvasWidth = 400, canvasHeight = 600
   
   // Initialize world with canvas dimensions
   initializeWorld(engine.world, canvasWidth, canvasHeight);
-  
-  // Start the physics engine
-  Runner.run(engine);
   
   console.log(`Physics engine initialized for player ${playerNum} with canvas ${canvasWidth}x${canvasHeight}`);
 }
@@ -185,27 +200,34 @@ function addFruitToPlayer(playerNum, fruitIndex) {
 
 // Drop fruit for a player
 function dropFruitForPlayer(playerNum) {
-  const gameState = gameStates[playerNum];
-  if (!gameState || gameState.disableAction || !gameState.currentBody) return;
+  const playerGameState = gameStates[playerNum];
+  if (!playerGameState || playerGameState.disableAction || !playerGameState.currentBody) return;
   
-  gameState.currentBody.isSleeping = false;
-  gameState.currentBody.isDropped = true;
-  gameState.disableAction = true;
-  gameState.placementCount++;
+  playerGameState.currentBody.isSleeping = false;
+  playerGameState.currentBody.isDropped = true;
+  playerGameState.disableAction = true;
+  playerGameState.placementCount++;
 
   // Update score
-  const score = FRUIT_SCORES[gameState.currentFruit.index] || 0;
-  gameState.score += score;
+  const score = FRUIT_SCORES[playerGameState.currentFruit.index] || 0;
+  playerGameState.score += score;
+  
+  // Update score display if this is the current view
+  if (playerNum === gameState.currentView) {
+    if (mainScore) {
+      mainScore.textContent = `Score: ${playerGameState.score}`;
+    }
+  }
   
   // Send drop event to server
   socket.emit('fruitDropped', {
     roomId: gameState.roomId,
     playerNumber: playerNum,
-    fruitIndex: gameState.currentFruit.index
+    fruitIndex: playerGameState.currentFruit.index
   });
 
   // Check for complete state sync (every 5 placements)
-  if (gameState.placementCount % 5 === 0) {
+  if (playerGameState.placementCount % 5 === 0) {
     setTimeout(() => {
       const completeState = serializeGameState(playerNum);
       if (completeState) {
@@ -221,7 +243,7 @@ function dropFruitForPlayer(playerNum) {
   setTimeout(() => {
     const newFruitIndex = Math.floor(Math.random() * 5);
     addFruitToPlayer(playerNum, newFruitIndex);
-    gameState.disableAction = false;
+    playerGameState.disableAction = false;
   }, 1000);
 }
 
@@ -322,55 +344,61 @@ function createMiniViewer(playerNum, playerData) {
   viewerDiv.className = 'mini-viewer';
   viewerDiv.id = `viewer-${playerNum}`;
   
-  // Build the viewer HTML (including the canvas that will actually be in the DOM)
-  console.log(`Creating mini viewer for player ${playerNum} with data:`, playerData);
+  // Build the viewer HTML
+  const displayName = playerNum === gameState.playerNumber ? 'Your Game' : `${playerData.nickname} (P${playerNum})`;
+  
   viewerDiv.innerHTML = `
     <div class="mini-viewer-header">
-      <div class="mini-viewer-name">${playerData.nickname}</div>
+      <div class="mini-viewer-name">${displayName}</div>
       <div class="mini-viewer-score" id="score-${playerNum}">Score: 0</div>
     </div>
     <canvas id="canvas-${playerNum}" width="300" height="150"></canvas>
     <div class="mini-viewer-status" id="status-${playerNum}">Waiting...</div>
   `;
   
-  // Append to DOM *before* we start rendering so the canvas is present
   viewersContainer.appendChild(viewerDiv);
   
-  // Grab the canvas that now exists inside the viewer
   const canvas = viewerDiv.querySelector('canvas');
-
-  // --- ENGINE INITIALISATION -------------------------------------------------
-  // Only create a new physics engine if we don't already have one for this player.
-  // This avoids overwriting the main player engine (and prevents score resets / recursion).
+  
+  // Ensure engine exists for this player
   if (!engines[playerNum]) {
     initializePlayerEngine(playerNum, 400, 600);
   }
-  
-  // Create and run the Matter.js render on the **actual** DOM canvas
-  const miniRender = createSimpleRender(engines[playerNum], canvas);
-  renders[playerNum] = miniRender;
+
+  // Create mini render
+  const miniRender = Render.create({
+    engine: engines[playerNum],
+    canvas: canvas,
+    options: {
+      wireframes: false,
+      background: "#F7f4C8",
+      width: canvas.width,
+      height: canvas.height,
+      pixelRatio: 'auto',
+      showDebug: false,
+      hasBounds: false,
+      enabled: true,
+      showVelocity: false,
+      showAngleIndicator: false
+    }
+  });
+
+  renders[`mini_${playerNum}`] = miniRender;
   Render.run(miniRender);
   
-  // Allow clicking the mini-viewer to switch the main view
   viewerDiv.addEventListener('click', () => {
     console.log(`Clicked on player ${playerNum} mini viewer`);
     switchToPlayerView(playerNum);
   });
   
-  // Immediately request the opponent's full state so their objects & score appear
-  if (playerNum !== gameState.playerNumber && gameState.roomId) {
-    console.log(`Requesting immediate complete state for player ${playerNum}`);
-    socket.emit('requestCompleteState', {
-      roomId: gameState.roomId,
-      requestedPlayerNumber: playerNum
-    });
-  }
-  
-  console.log(`Mini viewer created for player ${playerNum}: ${playerData.nickname}`);
-  }
+  console.log(`Mini viewer created for player ${playerNum}: ${displayName}`);
+}
 
 // Update mini viewer
 function updateMiniViewer(playerNum) {
+  // Skip update if this is the current main view to prevent recursion
+  if (gameState.currentView === playerNum) return;
+
   // Clear existing timeout for this player to prevent excessive calls
   if (updateMiniViewerTimeouts[playerNum]) {
     clearTimeout(updateMiniViewerTimeouts[playerNum]);
@@ -393,16 +421,7 @@ function updateMiniViewer(playerNum) {
       statusElement.textContent = playerGameState.disableAction ? 'Dropping...' : 'Playing';
       statusElement.className = `mini-viewer-status ${playerGameState.disableAction ? 'waiting' : 'playing'}`;
     }
-    
-    // IMPORTANT: Only update main score if this is the currently viewed player
-    // This prevents recursion and ensures the main score shows the correct player
-    if (gameState.currentView === playerNum) {
-      // Direct update without calling updateMainGameControls to prevent recursion
-      if (mainScore) {
-        mainScore.textContent = `Score: ${playerGameState.score}`;
-      }
-    }
-  }, 50); // 50ms debounce
+  }, 50);
 }
 
 
@@ -429,63 +448,66 @@ function createSimpleRender(engine, canvas) {
 
 // Switch to player view - simple approach
 function switchToPlayerView(playerNum) {
-  if (gameState.currentView === playerNum) return;
-  
-  console.log(`Switching from player ${gameState.currentView} to player ${playerNum}`);
-  
-  // Stop and clear ALL renders completely
-  Object.keys(renders).forEach(pNum => {
-    const render = renders[pNum];
-    if (render) {
-      Render.stop(render);
-      delete renders[pNum];
-    }
+  // Add debug logging to track view state
+  console.log('View switch requested:', {
+    from: gameState.currentView,
+    to: playerNum,
+    myPlayerNumber: gameState.playerNumber
   });
+
+  // Validate the view switch
+  if (gameState.currentView === playerNum) {
+    console.log('Already viewing this player, skipping switch');
+    return;
+  }
+
+  if (!engines[playerNum]) {
+    console.error(`Cannot switch to player ${playerNum}, no engine exists`);
+    return;
+  }
+
+  const oldView = gameState.currentView;
   
+  // Stop and remove the current main render if it exists
+  const currentMainRender = renders[`main_${oldView}`];
+  if (currentMainRender) {
+    console.log(`Stopping main render for player ${oldView}`);
+    Render.stop(currentMainRender);
+    delete renders[`main_${oldView}`];
+  }
+  
+  // Update view state AFTER cleanup
   gameState.currentView = playerNum;
   
   // Update main canvas
   mainCanvas.width = 400;
   mainCanvas.height = 600;
   
-  // Ensure the engine and world exist for this player
-  const targetEngine = engines[playerNum];
-  const targetGameState = gameStates[playerNum];
-  
-  if (!targetEngine || !targetGameState) {
-    console.error(`No engine or gameState found for player ${playerNum}`);
-    return;
-  }
-  
-  console.log(`Player ${playerNum} world has ${targetGameState.world.bodies.length} bodies`);
-  
-  // Create one simple render for main canvas
-  const mainRender = createSimpleRender(targetEngine, mainCanvas);
-  renders[playerNum] = mainRender;
-  Render.run(mainRender);
-  
-  // Force a render update to show existing bodies
-  setTimeout(() => {
-    if (renders[playerNum]) {
-      Render.world(renders[playerNum]);
-      
-      // If viewing another player's game, request their complete state
-      if (playerNum !== gameState.playerNumber) {
-        console.log(`Requesting complete state for player ${playerNum}`);
-        socket.emit('requestCompleteState', {
-          roomId: gameState.roomId,
-          requestedPlayerNumber: playerNum
-        });
-      }
+  // Create new main render with a clean configuration
+  const mainRender = Render.create({
+    engine: engines[playerNum],
+    canvas: mainCanvas,
+    options: {
+      wireframes: false,
+      background: "#F7f4C8",
+      width: mainCanvas.width,
+      height: mainCanvas.height,
+      pixelRatio: 'auto',
+      showDebug: false,
+      hasBounds: false,
+      enabled: true,
+      showVelocity: false,
+      showAngleIndicator: false
     }
-  }, 100);
+  });
   
-  console.log(`Created simple render for player ${playerNum} on main canvas`);
+  // Store the main render with a prefix
+  renders[`main_${playerNum}`] = mainRender;
+  Render.run(mainRender);
   
   // Update UI
   const playerData = gameState.players.find(p => p.number === playerNum);
   if (playerData) {
-    // Show "Your Game" if viewing your own game, otherwise show the player's name
     if (playerNum === gameState.playerNumber) {
       mainPlayerName.textContent = 'Your Game';
     } else {
@@ -500,13 +522,7 @@ function switchToPlayerView(playerNum) {
   const activeViewer = document.getElementById(`viewer-${playerNum}`);
   if (activeViewer) {
     activeViewer.classList.add('active');
-    console.log(`Set active highlight on viewer-${playerNum}`);
-  } else {
-    console.error(`Could not find viewer-${playerNum} to highlight`);
   }
-  
-  // Update controls
-  updateMainGameControls(playerNum);
   
   // Enable/disable interaction based on whether viewing your own game
   const isViewingOwnGame = playerNum === gameState.playerNumber;
@@ -516,7 +532,6 @@ function switchToPlayerView(playerNum) {
   if (isViewingOwnGame) {
     hideCursorIndicator();
   } else {
-    // Show cursor indicator for other players' games
     const opponentGameState = gameStates[playerNum];
     if (opponentGameState && opponentGameState.currentBody) {
       updateCursorIndicator(
@@ -526,19 +541,20 @@ function switchToPlayerView(playerNum) {
     }
   }
   
-  // Debug: Log canvas state and render info
-  console.log(`Switched to player ${playerNum} view. Canvas size: ${mainCanvas.width}x${mainCanvas.height}`);
-  console.log(`Canvas client size: ${mainCanvas.clientWidth}x${mainCanvas.clientHeight}`);
-  console.log(`Canvas style: width=${mainCanvas.style.width}, height=${mainCanvas.style.height}`);
-  
-  // Ensure canvas is properly sized
-  setTimeout(() => {
-    const render = renders[playerNum];
-    if (render) {
-      console.log(`Render bounds: width=${render.bounds.max.x - render.bounds.min.x}, height=${render.bounds.max.y - render.bounds.min.y}`);
-      console.log(`Render options: width=${render.options.width}, height=${render.options.height}`);
-    }
-  }, 100);
+  // If viewing another player's game, request their complete state
+  if (playerNum !== gameState.playerNumber) {
+    console.log(`Requesting complete state for player ${playerNum}`);
+    socket.emit('requestCompleteState', {
+      roomId: gameState.roomId,
+      requestedPlayerNumber: playerNum
+    });
+  }
+
+  console.log('View switch completed:', {
+    from: oldView,
+    to: playerNum,
+    currentView: gameState.currentView
+  });
 }
 
 // Update main game controls
@@ -615,7 +631,12 @@ function handleCollision(event, playerNum) {
       const combinationScore = FRUIT_SCORES[index + 1] || 0;
       playerGameState.score += combinationScore;
       
-      console.log(`Player ${playerNum} scored ${combinationScore} points, total: ${playerGameState.score}`);
+      // Update score display
+      if (playerNum === gameState.currentView) {
+        if (mainScore) {
+          mainScore.textContent = `Score: ${playerGameState.score}`;
+        }
+      }
       
       // Broadcast score update to other players
       socket.emit('scoreUpdate', {
@@ -623,9 +644,6 @@ function handleCollision(event, playerNum) {
         playerNumber: playerNum,
         score: playerGameState.score
       });
-      
-      // Update mini viewer for this player
-      updateMiniViewer(playerNum);
       
       // Check for watermelon win
       if (index + 1 === 10) {
@@ -837,35 +855,60 @@ function setupSocketEvents() {
     console.log('Player data received:', data.players);
     console.log(`DEBUG: Client received player number: ${data.playerNumber}`);
     console.log(`DEBUG: Client nickname from localStorage: ${gameState.playerNickname}`);
+    
+    // Initialize game state
     gameState.playerNumber = data.playerNumber;
     gameState.players = data.players;
     gameState.maxPlayers = data.maxPlayers;
+    gameState.currentView = data.playerNumber; // Set initial view to your own player number
+    
+    console.log('Game state initialized:', {
+      playerNumber: gameState.playerNumber,
+      currentView: gameState.currentView,
+      totalPlayers: data.players.length
+    });
     
     // Set main canvas to narrower size for better gameplay
     mainCanvas.width = 400;
     mainCanvas.height = 600;
+    
     // Initialize main player with canvas dimensions
     initializePlayerEngine(gameState.playerNumber, mainCanvas.width, mainCanvas.height);
     
     // Create initial main render
-    const initialRender = createSimpleRender(engines[gameState.playerNumber], mainCanvas);
-    renders[gameState.playerNumber] = initialRender;
+    const initialRender = Render.create({
+      engine: engines[gameState.playerNumber],
+      canvas: mainCanvas,
+      options: {
+        wireframes: false,
+        background: "#F7f4C8",
+        width: mainCanvas.width,
+        height: mainCanvas.height,
+        pixelRatio: 'auto',
+        showDebug: false,
+        hasBounds: false,
+        enabled: true,
+        showVelocity: false,
+        showAngleIndicator: false
+      }
+    });
+    
+    renders[`main_${gameState.playerNumber}`] = initialRender;
     Render.run(initialRender);
     
-    // Create mini viewers with YOURSELF first, then others – client-specific order
-    const sortedPlayers = [...data.players].sort((pA, pB) => {
-      // put my own player (data.playerNumber) at the front
-      if (pA.number === data.playerNumber) return -1;
-      if (pB.number === data.playerNumber) return 1;
-      return pA.number - pB.number; // keep deterministic order for remaining
-    });
-
-    console.log('Creating mini viewers for sorted players:', sortedPlayers);
-    console.log('Current player number:', data.playerNumber);
-    console.log('Current player nickname from localStorage:', gameState.playerNickname);
-    sortedPlayers.forEach(player => {
-        console.log(`Creating mini viewer for player ${player.number} (${player.nickname})`);
+    // First create the current player's viewer
+    const currentPlayer = data.players.find(p => p.number === data.playerNumber);
+    if (currentPlayer) {
+      console.log(`Creating current player's viewer first: ${currentPlayer.nickname} (P${currentPlayer.number})`);
+      createMiniViewer(currentPlayer.number, currentPlayer);
+    }
+    
+    // Then create viewers for other players
+    data.players.forEach(player => {
+      if (player.number !== data.playerNumber) {
+        console.log(`Creating other player's viewer: ${player.nickname} (P${player.number})`);
         createMiniViewer(player.number, player);
+      }
     });
     
     // Set up collision detection
@@ -877,9 +920,7 @@ function setupSocketEvents() {
     // Start game
     gameState.gameStarted = true;
     
-    // Set initial view to your own game and add initial fruit
-    // IMPORTANT: Always start with your own view based on your player number
-    switchToPlayerView(gameState.playerNumber);
+    // Add initial fruit
     addFruitToPlayer(gameState.playerNumber, Math.floor(Math.random() * 5));
   });
   
@@ -897,6 +938,9 @@ function setupSocketEvents() {
   socket.on('playerLeft', (data) => {
     console.log('Player left game:', data);
     gameState.players = data.players;
+    
+    // Clean up the leaving player's resources
+    cleanupPlayer(data.playerNumber);
     
     // Remove mini viewer
     const viewerElement = document.getElementById(`viewer-${data.playerNumber}`);

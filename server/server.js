@@ -325,7 +325,7 @@ io.on('connection', (socket) => {
     
     const players = [{
       id: socket.id,
-      number: 1,
+      number: 2, // Start with player 2 for host
       nickname: hostNickname,
       isHost: true,
       isReady: true
@@ -367,13 +367,13 @@ io.on('connection', (socket) => {
     
     // Check if player is already in the room
     if (room.players.includes(socket.id)) {
-      const existingPlayerNumber = room.players.indexOf(socket.id) + 1;
+      const existingPlayerNumber = room.players.indexOf(socket.id) + 2; // Add 2 instead of 1
       console.log('Player already in room as player', existingPlayerNumber);
       
       const players = room.players.map((playerId, index) => ({
         id: playerId,
-        number: index + 1,
-        nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 1}`,
+        number: index + 2, // Add 2 instead of 1
+        nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 2}`,
         isHost: playerId === room.hostId,
         isReady: playerProfiles.get(playerId)?.isReady || false
       }));
@@ -401,25 +401,17 @@ io.on('connection', (socket) => {
     }
     
     playerProfiles.set(socket.id, { nickname: uniqueNickname, isReady: true });
-    console.log(`DEBUG: Assigned unique nickname "${uniqueNickname}" to player ${socket.id} (original: "${nickname}")`);
     
-    console.log(`DEBUG: Stored profile for ${socket.id}:`, playerProfiles.get(socket.id));
-    console.log(`DEBUG: All profiles after adding ${nickname}:`, Array.from(playerProfiles.entries()));
-    console.log(`DEBUG: Room ${roomCode} now has players:`, room.players.map(id => ({ id, nickname: playerProfiles.get(id)?.nickname })));
-    
-    const playerNumber = room.players.length;
-    console.log(`DEBUG: Player ${socket.id} (${nickname}) added to room at index ${room.players.length - 1}, assigned player number ${playerNumber}`);
-    console.log(`DEBUG: Room ${roomCode} players array:`, room.players);
-    console.log(`Player ${nickname} joined as player ${playerNumber}. Room now has ${room.players.length} players.`);
+    const playerNumber = room.players.length + 1; // This will start from 3 since host is 2
+    console.log(`Player ${uniqueNickname} joined as player ${playerNumber}. Room now has ${room.players.length} players.`);
     
     // Create players list
     const players = room.players.map((playerId, index) => {
       const profile = playerProfiles.get(playerId);
-      console.log(`DEBUG: Getting profile for ${playerId}:`, profile);
       return {
         id: playerId,
-        number: index + 1,
-        nickname: profile?.nickname || `Player ${index + 1}`,
+        number: index + 2, // Add 2 instead of 1
+        nickname: profile?.nickname || `Player ${index + 2}`,
         isHost: playerId === room.hostId,
         isReady: profile?.isReady || false
       };
@@ -459,11 +451,11 @@ io.on('connection', (socket) => {
     
     // Notify other players
     socket.to(roomId).emit('playerLeft', {
-      playerNumber: playerIndex + 1,
+      playerNumber: playerIndex + 2, // Adjust player number for leaving
       players: room.players.map((playerId, index) => ({
         id: playerId,
-        number: index + 1,
-        nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 1}`,
+        number: index + 2, // Adjust player number for leaving
+        nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 2}`,
         isHost: playerId === room.hostId,
         isReady: playerProfiles.get(playerId)?.isReady || false
       }))
@@ -507,8 +499,8 @@ io.on('connection', (socket) => {
     
     const players = room.players.map((playerId, index) => ({
       id: playerId,
-      number: index + 1,
-      nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 1}`,
+      number: index + 2, // Adjust player number for starting game
+      nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 2}`,
       isHost: playerId === room.hostId,
       isReady: true
     }));
@@ -592,7 +584,7 @@ io.on('connection', (socket) => {
     }
     
     // Always use the player's actual index for their number
-    let assignedPlayerNumber = playerIndex + 1;
+    let assignedPlayerNumber = playerIndex + 2; // Adjust for new numbering
     
     console.log(`DEBUG: Player ${socket.id} (${nickname}) assigned player number ${assignedPlayerNumber} (index in array: ${playerIndex})`);
     console.log(`DEBUG: Room players:`, room.players);
@@ -602,8 +594,8 @@ io.on('connection', (socket) => {
       const profile = playerProfiles.get(playerId);
       return {
         id: playerId,
-        number: index + 1,
-        nickname: profile?.nickname || `Player ${index + 1}`,
+        number: index + 2, // Adjust for new numbering
+        nickname: profile?.nickname || `Player ${index + 2}`,
         isHost: playerId === room.hostId,
         isReady: true
       };
@@ -656,7 +648,7 @@ io.on('connection', (socket) => {
       for (const [roomId, room] of gameRooms.entries()) {
         const playerIndex = room.players.indexOf(socket.id);
         if (playerIndex !== -1) {
-          console.log(`Removing player ${socket.id} from room ${roomId} (was player ${playerIndex + 1})`);
+          console.log(`Removing player ${socket.id} from room ${roomId} (was player ${playerIndex + 2})`); // Adjust for new numbering
           room.players.splice(playerIndex, 1);
           
           if (room.players.length === 0) {
