@@ -169,17 +169,26 @@ function refreshRooms() {
 function updatePlayersList(players) {
   if (!playersContainer) return;
   
-  if (players.length === 0) {
+  // Handle undefined or null players
+  if (!players) {
     playersContainer.innerHTML = '<p class="no-players">No players in room yet</p>';
     return;
   }
   
-  playersContainer.innerHTML = players.map(player => `
+  // Ensure players is an array
+  const playerArray = Array.isArray(players) ? players : [];
+  
+  if (playerArray.length === 0) {
+    playersContainer.innerHTML = '<p class="no-players">No players in room yet</p>';
+    return;
+  }
+  
+  playersContainer.innerHTML = playerArray.map(player => `
     <div class="player-item">
       <div class="player-info">
         <div class="player-avatar">${player.nickname.charAt(0).toUpperCase()}</div>
         <div class="player-details">
-          <h4>${player.nickname}</h4>
+          <h4>${player.nickname} (P${player.number})</h4>
           <p>${player.isHost ? 'Host' : 'Player'}</p>
         </div>
       </div>
@@ -368,9 +377,17 @@ function setupSocketEvents() {
   
   socket.on('playerLeft', (data) => {
     console.log('Player left:', data);
-    currentRoom.players = data.players;
-    updatePlayersList(data.players);
-    updateRoomDisplay();
+    // Handle case where data.players might be undefined
+    if (data && Array.isArray(data.players)) {
+      currentRoom.players = data.players;
+      updatePlayersList(data.players);
+      updateRoomDisplay();
+    } else {
+      // If no players data, assume empty room
+      currentRoom.players = [];
+      updatePlayersList([]);
+      updateRoomDisplay();
+    }
   });
   
   socket.on('playerReady', (data) => {
