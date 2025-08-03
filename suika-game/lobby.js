@@ -252,6 +252,14 @@ function setupEventListeners() {
   roomCodeInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') joinRoom();
   });
+  
+  // Clear nickname button
+  document.getElementById('clear-nickname').addEventListener('click', () => {
+    localStorage.removeItem('suika-nickname');
+    nicknameInput.value = '';
+    currentPlayer.nickname = '';
+    console.log('Cleared saved nickname');
+  });
 }
 
 // Socket event handlers
@@ -261,11 +269,14 @@ function setupSocketEvents() {
     console.log('Connected to server');
     updateConnectionStatus('Connected', 'connected');
     
-    // Load saved nickname
+    // Load saved nickname (persists across browser tabs)
     const savedNickname = localStorage.getItem('suika-nickname');
     if (savedNickname) {
       currentPlayer.nickname = savedNickname;
       nicknameInput.value = savedNickname;
+      console.log('Loaded saved nickname:', savedNickname);
+    } else {
+      console.log('No saved nickname found');
     }
     
     // Get available rooms

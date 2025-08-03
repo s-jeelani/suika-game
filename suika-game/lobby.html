@@ -23,7 +23,11 @@
             <h2>Your Profile</h2>
             <div class="profile-form">
                 <label for="nickname">Nickname:</label>
-                <input type="text" id="nickname" placeholder="Enter your nickname" maxlength="20">
+                <div class="nickname-input-group">
+                    <input type="text" id="nickname" placeholder="Enter your nickname" maxlength="20">
+                    <button id="clear-nickname" type="button" title="Clear saved nickname">Clear</button>
+                </div>
+                <small class="help-text">Nickname is saved and will appear in new tabs</small>
             </div>
         </section>
 

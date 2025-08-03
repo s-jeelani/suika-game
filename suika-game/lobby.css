@@ -99,6 +99,37 @@ section h3 {
     max-width: 400px;
 }
 
+.nickname-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.nickname-input-group input {
+    flex: 1;
+}
+
+.nickname-input-group button {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.nickname-input-group button:hover {
+    background: #ff5252;
+}
+
+.help-text {
+    font-size: 0.8rem;
+    color: #666;
+    font-style: italic;
+}
+
 .room-form label, .profile-form label {
     font-weight: 600;
     color: #8B4513;
