@@ -7,20 +7,6 @@
     {
       "source": "/game",
       "destination": "/game.html"
-    },
-    {
-      "source": "/((?!.*\\.).*)",
-      "destination": "/index.html"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "/public/(.*)",
-      "dest": "/public/$1"
     }
   ],
   "headers": [

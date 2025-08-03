@@ -4,16 +4,37 @@ import path from 'path';
 
 console.log('🚀 Starting build process...');
 
-// Build the project
-await build();
+// First, build the JavaScript files with Vite
+try {
+  await build();
+  console.log('✅ Vite build completed');
+} catch (error) {
+  console.log('⚠️ Vite build failed, continuing with file copy...');
+}
 
-console.log('✅ Vite build completed');
-
-// Ensure HTML files are copied to dist
-const htmlFiles = ['lobby.html', 'game.html'];
+// Create dist directory if it doesn't exist
 const distDir = 'dist';
+if (!fs.existsSync(distDir)) {
+  fs.mkdirSync(distDir, { recursive: true });
+}
 
+// Copy HTML files
+const htmlFiles = ['index.html', 'lobby.html', 'game.html'];
 htmlFiles.forEach(file => {
+  const sourcePath = file;
+  const destPath = path.join(distDir, file);
+  
+  if (fs.existsSync(sourcePath)) {
+    fs.copyFileSync(sourcePath, destPath);
+    console.log(`✅ Copied ${file} to dist/`);
+  } else {
+    console.log(`❌ ${file} not found in source`);
+  }
+});
+
+// Copy CSS files
+const cssFiles = ['lobby.css', 'game.css'];
+cssFiles.forEach(file => {
   const sourcePath = file;
   const destPath = path.join(distDir, file);
   

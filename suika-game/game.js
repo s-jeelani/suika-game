@@ -1,7 +1,6 @@
 import {Bodies, Body, Events, Engine, Render, Runner, World, Sleeping} from "matter-js"
 import { FRUITS } from './fruits.js'
 import { SERVER_URL } from './config.js'
-import './game.css'
 
 // Socket.IO connection
 console.log('Connecting to game server:', SERVER_URL);
@@ -526,7 +525,7 @@ const FRUIT_SCORES = {
 function setupEventListeners() {
   // Back to lobby
   backToLobbyBtn.addEventListener('click', () => {
-    window.location.href = '/lobby';
+    window.location.href = '/lobby.html';
   });
   
   // Main canvas click
@@ -550,7 +549,7 @@ function setupEventListeners() {
   });
   
   document.getElementById('back-lobby').addEventListener('click', () => {
-    window.location.href = '/lobby';
+    window.location.href = '/lobby.html';
   });
 }
 
@@ -600,7 +599,7 @@ function setupSocketEvents() {
       socket.emit('joinGameRoom', { roomId, nickname });
     } else {
       alert('No room information found. Please return to lobby.');
-      window.location.href = '/lobby';
+      window.location.href = '/lobby.html';
     }
   });
   

@@ -131,121 +131,20 @@ io.on('connection', (socket) => {
     players: room.players
   })));
 
-    socket.on('joinGame', (roomId) => {
-    console.log('Player attempting to join room:', roomId, 'with socket ID:', socket.id);
-    socket.join(roomId);
-    
-    if (!gameRooms.has(roomId)) {
-      gameRooms.set(roomId, {
-        players: [],
-        scores: { player1Score: 0, player2Score: 0 },
-        gameState: 'waiting',
-        randomSeed: null,
-        playerStates: {},
-        healthChecks: {},
-        winner: null,
-        maxPlayers: 4,
-        roomName: '',
-        hostId: null,
-        createdAt: new Date().toISOString()
-      });
-      console.log('Created new room:', roomId);
-    }
-    
-    const room = gameRooms.get(roomId);
-    console.log('Room state before join:', {
-      roomId,
-      currentPlayers: room.players,
-      playerCount: room.players.length
-    });
-    
-    // Check if player is already in the room
-    if (room.players.includes(socket.id)) {
-      const existingPlayerNumber = room.players.indexOf(socket.id) + 1;
-      console.log('Player already in room as player', existingPlayerNumber);
-      socket.emit('joinedRoom', {
-        roomId,
-        playerId: socket.id,
-        playerNumber: existingPlayerNumber
-      });
-      return;
-    }
-    
-    // Add player to room if there's space
-    if (room.players.length < 2) {
-      room.players.push(socket.id);
-      playerScores.set(socket.id, 0);
-      
-      const playerNumber = room.players.length; // 1 or 2
-      console.log(`Player ${socket.id} joined as player ${playerNumber}. Room now has ${room.players.length} players.`);
-      
-      // Send joinedRoom to the new player
-      socket.emit('joinedRoom', {
-        roomId,
-        playerId: socket.id,
-        playerNumber: playerNumber
-      });
-      
-      // Start game only when exactly 2 players
-      if (room.players.length === 2) {
-        room.gameState = 'playing';
-        room.winner = null; // Reset winner for new game
-        
-        // Generate a shared random seed for synchronized randomness
-        const randomSeed = Math.floor(Math.random() * 1000000);
-        room.randomSeed = randomSeed;
-        
-        console.log('Starting game with 2 players, random seed:', randomSeed);
-        io.to(roomId).emit('gameStart', {
-          player1: room.players[0],
-          player2: room.players[1],
-          randomSeed: randomSeed
-        });
-      } else {
-        // Notify waiting for more players
-        socket.emit('waitingForPlayers', {
-          currentPlayers: room.players.length,
-          requiredPlayers: 2
-        });
-      }
-    } else {
-      // Room is full
-      socket.emit('roomFull', { roomId });
-    }
-  });
+    // Old joinGame handler removed - using new lobby system instead
 
-  socket.on('updateScore', ({ roomId, player1Score, player2Score }) => {
-    const room = gameRooms.get(roomId);
-    if (room) {
-      room.scores.player1Score = player1Score || room.scores.player1Score;
-      room.scores.player2Score = player2Score || room.scores.player2Score;
-      
-      io.to(roomId).emit('scoreUpdate', room.scores);
-    }
-  });
+  // Old game event handlers removed - using new lobby system instead
 
-  // Handle real-time fruit movement
+  // Handle real-time fruit movement (new system)
   socket.on('fruitMove', ({ roomId, playerNumber, x, y }) => {
     // Broadcast to other players in the room
     socket.to(roomId).emit('opponentFruitMove', { playerNumber, x, y });
   });
 
-  // Handle fruit drops
+  // Handle fruit drops (new system)
   socket.on('fruitDropped', ({ roomId, playerNumber, fruitIndex }) => {
     // Broadcast to other players in the room
     socket.to(roomId).emit('opponentFruitDropped', { playerNumber, fruitIndex });
-  });
-
-  // Handle individual player fruit initialization
-  socket.on('initializeMyFruit', ({ roomId, playerNumber, fruitIndex }) => {
-    // Broadcast to other players in the room
-    socket.to(roomId).emit('opponentInitialFruit', { playerNumber, fruitIndex });
-  });
-
-  // Handle new fruit generation
-  socket.on('generateNewFruit', ({ roomId, playerNumber, fruitIndex }) => {
-    // Broadcast to other players in the room
-    socket.to(roomId).emit('newFruit', { playerNumber, fruitIndex });
   });
 
   // Handle complete game state synchronization (every 5 placements)
@@ -378,6 +277,8 @@ io.on('connection', (socket) => {
     });
     
     console.log(`Room created: ${roomId} by ${hostNickname}`);
+    console.log('Total rooms after creation:', gameRooms.size);
+    console.log('Available rooms:', Array.from(gameRooms.keys()));
   });
 
   // Handle room joining
@@ -508,9 +409,17 @@ io.on('connection', (socket) => {
   // Handle game start
   socket.on('startGame', ({ roomId }) => {
     console.log('Starting game for room:', roomId);
+    console.log('Available rooms:', Array.from(gameRooms.keys()));
     
     const room = gameRooms.get(roomId);
-    if (!room || room.hostId !== socket.id) {
+    if (!room) {
+      console.log(`Room ${roomId} not found when starting game`);
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+    
+    if (room.hostId !== socket.id) {
+      console.log(`Player ${socket.id} tried to start game but host is ${room.hostId}`);
       socket.emit('error', { message: 'Only host can start the game' });
       return;
     }
@@ -526,6 +435,7 @@ io.on('connection', (socket) => {
       isReady: true
     }));
     
+    console.log(`Emitting gameStarting to room ${roomId} with ${players.length} players`);
     io.to(roomId).emit('gameStarting', {
       roomId,
       players,
@@ -536,15 +446,20 @@ io.on('connection', (socket) => {
   // Handle joining game room (from lobby)
   socket.on('joinGameRoom', ({ roomId, nickname }) => {
     console.log('Player joining game room:', roomId, nickname);
+    console.log('Available rooms:', Array.from(gameRooms.keys()));
     
     const room = gameRooms.get(roomId);
     if (!room) {
+      console.log(`Room ${roomId} not found. Available rooms:`, Array.from(gameRooms.keys()));
       socket.emit('error', { message: 'Game room not found' });
       return;
     }
     
     // Check if player is in room by socket ID or by nickname
     let playerIndex = room.players.indexOf(socket.id);
+    console.log(`Player ${socket.id} (${nickname}) checking room ${roomId}`);
+    console.log(`Room players:`, room.players);
+    
     if (playerIndex === -1) {
       // Try to find player by nickname (for new socket connections)
       const playerProfilesArray = Array.from(playerProfiles.entries());
@@ -553,6 +468,7 @@ io.on('connection', (socket) => {
       if (playerEntry) {
         const oldSocketId = playerEntry[0];
         playerIndex = room.players.indexOf(oldSocketId);
+        console.log(`Found player by nickname: ${nickname} -> ${oldSocketId}, index: ${playerIndex}`);
         
         if (playerIndex !== -1) {
           // Update the player's socket ID to the new connection
@@ -561,7 +477,11 @@ io.on('connection', (socket) => {
           playerProfiles.delete(oldSocketId);
           console.log(`Updated socket ID for player ${nickname}: ${oldSocketId} -> ${socket.id}`);
         }
+      } else {
+        console.log(`No player profile found for nickname: ${nickname}`);
       }
+    } else {
+      console.log(`Player ${socket.id} found directly in room at index ${playerIndex}`);
     }
     
     if (playerIndex === -1) {
@@ -608,25 +528,37 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     
-    // Remove player from all rooms
+    // Check if this is a transition to game (room is in 'playing' state)
+    let isGameTransition = false;
     for (const [roomId, room] of gameRooms.entries()) {
-      const playerIndex = room.players.indexOf(socket.id);
-      if (playerIndex !== -1) {
-        console.log(`Removing player ${socket.id} from room ${roomId} (was player ${playerIndex + 1})`);
-        room.players.splice(playerIndex, 1);
-        
-        if (room.players.length === 0) {
-          console.log(`Deleting empty room ${roomId}`);
-          gameRooms.delete(roomId);
-        } else {
-          console.log(`Room ${roomId} now has ${room.players.length} players`);
-          io.to(roomId).emit('playerLeft', {
-            leftPlayerId: socket.id,
-            remainingPlayers: room.players.length
-          });
-          room.gameState = 'waiting';
-        }
+      if (room.players.includes(socket.id) && room.gameState === 'playing') {
+        isGameTransition = true;
+        console.log(`Player ${socket.id} disconnecting during game transition for room ${roomId}`);
         break;
+      }
+    }
+    
+    // Only remove player if it's not a game transition
+    if (!isGameTransition) {
+      for (const [roomId, room] of gameRooms.entries()) {
+        const playerIndex = room.players.indexOf(socket.id);
+        if (playerIndex !== -1) {
+          console.log(`Removing player ${socket.id} from room ${roomId} (was player ${playerIndex + 1})`);
+          room.players.splice(playerIndex, 1);
+          
+          if (room.players.length === 0) {
+            console.log(`Deleting empty room ${roomId}`);
+            gameRooms.delete(roomId);
+          } else {
+            console.log(`Room ${roomId} now has ${room.players.length} players`);
+            io.to(roomId).emit('playerLeft', {
+              leftPlayerId: socket.id,
+              remainingPlayers: room.players.length
+            });
+            room.gameState = 'waiting';
+          }
+          break;
+        }
       }
     }
     

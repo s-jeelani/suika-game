@@ -1,5 +1,4 @@
 import { SERVER_URL } from './config.js';
-import './lobby.css';
 
 // Socket.IO connection
 console.log('Connecting to server:', SERVER_URL);
@@ -378,8 +377,8 @@ function setupSocketEvents() {
     localStorage.setItem('suika-room-id', currentRoom.id);
     localStorage.setItem('suika-player-nickname', currentPlayer.nickname);
     
-    // Navigate to game immediately
-    window.location.href = '/game';
+    // Navigate to game immediately (all players including host)
+    window.location.href = '/game.html';
   });
   
   socket.on('error', (data) => {

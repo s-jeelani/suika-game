@@ -8,18 +8,15 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       input: {
-        main: 'index.html',
-        lobby: 'lobby.html',
-        game: 'game.html'
+        lobby: 'lobby.js',
+        game: 'game.js'
       },
       output: {
         manualChunks: undefined,
+        entryFileNames: '[name].js'
       }
     },
     copyPublicDir: true
-  },
-  css: {
-    modules: false
   },
   assetsInclude: ['**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.svg'],
   publicDir: 'public',
