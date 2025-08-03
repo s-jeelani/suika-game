@@ -408,6 +408,8 @@ io.on('connection', (socket) => {
     console.log(`DEBUG: Room ${roomCode} now has players:`, room.players.map(id => ({ id, nickname: playerProfiles.get(id)?.nickname })));
     
     const playerNumber = room.players.length;
+    console.log(`DEBUG: Player ${socket.id} (${nickname}) added to room at index ${room.players.length - 1}, assigned player number ${playerNumber}`);
+    console.log(`DEBUG: Room ${roomCode} players array:`, room.players);
     console.log(`Player ${nickname} joined as player ${playerNumber}. Room now has ${room.players.length} players.`);
     
     // Create players list
@@ -531,20 +533,26 @@ io.on('connection', (socket) => {
       return;
     }
     
+    console.log(`DEBUG: Room ${roomId} state: ${room.gameState}, players: ${room.players.length}`);
+    
     // Check if player is already in room by socket ID or by nickname (for reconnection)
     let playerIndex = room.players.indexOf(socket.id);
-    console.log(`Player ${socket.id} (${nickname}) checking room ${roomId}`);
-    console.log(`Room players:`, room.players);
+    console.log(`DEBUG: Player ${socket.id} (${nickname}) checking room ${roomId}`);
+    console.log(`DEBUG: Room players array:`, room.players);
+    console.log(`DEBUG: Player index in room:`, playerIndex);
+    console.log(`DEBUG: Room players with nicknames:`, room.players.map(id => ({ id, nickname: playerProfiles.get(id)?.nickname })));
     
     if (playerIndex === -1) {
       // Try to find player by nickname (for reconnection from game page)
       const playerProfilesArray = Array.from(playerProfiles.entries());
+      console.log(`DEBUG: Looking for player with nickname "${nickname}" in profiles:`, playerProfilesArray.map(([id, profile]) => ({ id, nickname: profile.nickname })));
+      
       const playerEntry = playerProfilesArray.find(([id, profile]) => profile.nickname === nickname);
       
       if (playerEntry) {
         const oldSocketId = playerEntry[0];
         playerIndex = room.players.indexOf(oldSocketId);
-        console.log(`Found player by nickname for reconnection: ${nickname} -> ${oldSocketId}, index: ${playerIndex}`);
+        console.log(`DEBUG: Found player by nickname for reconnection: ${nickname} -> ${oldSocketId}, index: ${playerIndex}`);
         
         if (playerIndex !== -1) {
           // Update the player's socket ID to the new connection
@@ -552,8 +560,12 @@ io.on('connection', (socket) => {
           const oldProfile = playerProfiles.get(oldSocketId);
           playerProfiles.set(socket.id, oldProfile);
           playerProfiles.delete(oldSocketId);
-          console.log(`Updated socket ID for reconnecting player ${nickname}: ${oldSocketId} -> ${socket.id}`);
+          console.log(`DEBUG: Updated socket ID for reconnecting player ${nickname}: ${oldSocketId} -> ${socket.id}`);
+        } else {
+          console.log(`DEBUG: Player with nickname "${nickname}" found in profiles but not in room players array`);
         }
+      } else {
+        console.log(`DEBUG: No player found with nickname "${nickname}" in profiles`);
       }
     } else {
       console.log(`Player ${socket.id} found directly in room at index ${playerIndex}`);
@@ -576,20 +588,35 @@ io.on('connection', (socket) => {
     }
     
     if (playerIndex === -1) {
-      console.log(`Player ${nickname} not found in room ${roomId}. Available players:`, room.players.map(id => playerProfiles.get(id)?.nickname));
-      socket.emit('error', { message: 'Player not in room - please rejoin from lobby' });
-      return;
+      console.log(`DEBUG: Player ${nickname} not found in room ${roomId}. Available players:`, room.players.map(id => playerProfiles.get(id)?.nickname));
+      console.log(`DEBUG: Adding player ${nickname} as new player to room ${roomId}`);
+      
+      // Add player to room as new player
+      room.players.push(socket.id);
+      playerScores.set(socket.id, 0);
+      playerProfiles.set(socket.id, { nickname, isReady: true });
+      
+      playerIndex = room.players.length - 1;
+      console.log(`DEBUG: Added player ${nickname} at index ${playerIndex}`);
     }
     
-    const playerNumber = playerIndex + 1;
+    // Always use the current socket’s ID to determine the player’s index in the room’s players array
+    const playerNumber = room.players.indexOf(socket.id) + 1;
     
+    console.log(`DEBUG: Player ${socket.id} (${nickname}) assigned player number ${playerNumber} (index in array: ${room.players.indexOf(socket.id)})`);
     console.log(`DEBUG: Creating players list for game join. Room players:`, room.players);
     console.log(`DEBUG: All player profiles:`, Array.from(playerProfiles.entries()));
     
+    // Double-check that the player number is correct
+    const expectedPlayerNumber = room.players.indexOf(socket.id) + 1;
+    if (playerNumber !== expectedPlayerNumber) {
+      console.log(`DEBUG: WARNING - Player number mismatch! Expected: ${expectedPlayerNumber}, Got: ${playerNumber}`);
+      console.log(`DEBUG: Room players array:`, room.players);
+      console.log(`DEBUG: Socket ID: ${socket.id}`);
+    }
+    
     const players = room.players.map((playerId, index) => {
       const profile = playerProfiles.get(playerId);
-      console.log(`DEBUG: Getting profile for ${playerId} (player ${index + 1}):`, profile);
-      console.log(`DEBUG: All player profiles at this moment:`, Array.from(playerProfiles.entries()));
       return {
         id: playerId,
         number: index + 1,
@@ -600,6 +627,7 @@ io.on('connection', (socket) => {
     });
     
     console.log(`DEBUG: Final players list:`, players);
+    console.log(`DEBUG: Sending gameJoined to player ${socket.id} with player number ${playerNumber}`);
     
     socket.emit('gameJoined', {
       roomId,

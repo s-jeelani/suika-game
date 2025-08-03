@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Numbering Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .player-info {
+            border: 2px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .player-number {
+            font-weight: bold;
+            color: #333;
+            font-size: 1.2em;
+        }
+        .player-nickname {
+            color: #666;
+            font-size: 1.1em;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .debug-info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            margin: 10px 0;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Player Numbering Debug Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Simulate Room Creation</h2>
+        <input type="text" id="host-nickname" placeholder="Host nickname" value="Alice">
+        <button onclick="simulateRoomCreation()">Create Room</button>
+        <div class="debug-info" id="room-creation-debug"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Simulate Player Joining</h2>
+        <input type="text" id="player-nickname" placeholder="Player nickname" value="Bob">
+        <button onclick="simulatePlayerJoin()">Join Room</button>
+        <div class="debug-info" id="player-join-debug"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Simulate Game Join</h2>
+        <button onclick="simulateGameJoin()">Join Game</button>
+        <div class="debug-info" id="game-join-debug"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Current Room State</h2>
+        <div id="room-state"></div>
+    </div>
+
+    <script>
+        // Simulate the server state
+        let gameRooms = new Map();
+        let playerProfiles = new Map();
+        let roomId = null;
+        
+        function simulateRoomCreation() {
+            const hostNickname = document.getElementById('host-nickname').value.trim();
+            if (!hostNickname) return;
+            
+            // Simulate room creation
+            roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const hostSocketId = `host_${Date.now()}`;
+            
+            const room = {
+                players: [hostSocketId],
+                scores: {},
+                gameState: 'waiting',
+                randomSeed: null,
+                playerStates: {},
+                healthChecks: {},
+                winner: null,
+                maxPlayers: 4,
+                roomName: 'Test Room',
+                hostId: hostSocketId,
+                createdAt: new Date().toISOString()
+            };
+            
+            gameRooms.set(roomId, room);
+            playerProfiles.set(hostSocketId, { nickname: hostNickname, isReady: true });
+            
+            document.getElementById('room-creation-debug').innerHTML = `
+                <div class="success">Room created successfully!</div>
+                <strong>Room ID:</strong> ${roomId}<br>
+                <strong>Host Socket ID:</strong> ${hostSocketId}<br>
+                <strong>Host Nickname:</strong> ${hostNickname}<br>
+                <strong>Room Players:</strong> ${room.players.length}<br>
+                <strong>Room State:</strong> ${room.gameState}
+            `;
+            
+            updateRoomState();
+        }
+        
+        function simulatePlayerJoin() {
+            const playerNickname = document.getElementById('player-nickname').value.trim();
+            if (!playerNickname || !roomId) return;
+            
+            const room = gameRooms.get(roomId);
+            if (!room) return;
+            
+            const playerSocketId = `player_${Date.now()}`;
+            
+            // Add player to room
+            room.players.push(playerSocketId);
+            playerProfiles.set(playerSocketId, { nickname: playerNickname, isReady: true });
+            
+            const playerNumber = room.players.length;
+            
+            document.getElementById('player-join-debug').innerHTML = `
+                <div class="success">Player joined successfully!</div>
+                <strong>Player Socket ID:</strong> ${playerSocketId}<br>
+                <strong>Player Nickname:</strong> ${playerNickname}<br>
+                <strong>Player Number:</strong> ${playerNumber}<br>
+                <strong>Room Players:</strong> ${room.players.length}
+            `;
+            
+            updateRoomState();
+        }
+        
+        function simulateGameJoin() {
+            if (!roomId) return;
+            
+            const room = gameRooms.get(roomId);
+            if (!room) return;
+            
+            // Simulate both players joining the game
+            const results = [];
+            
+            room.players.forEach((playerId, index) => {
+                const profile = playerProfiles.get(playerId);
+                const playerNumber = index + 1;
+                
+                results.push({
+                    playerId,
+                    playerNumber,
+                    nickname: profile?.nickname || `Player ${playerNumber}`,
+                    isHost: playerId === room.hostId
+                });
+            });
+            
+            document.getElementById('game-join-debug').innerHTML = `
+                <div class="success">Game join simulation complete!</div>
+                <strong>Results:</strong><br>
+                ${results.map(r => `
+                    <div class="player-info">
+                        <div class="player-number">Player ${r.playerNumber}</div>
+                        <div class="player-nickname">${r.nickname}</div>
+                        <div>Socket ID: ${r.playerId}</div>
+                        <div>Host: ${r.isHost ? 'Yes' : 'No'}</div>
+                    </div>
+                `).join('')}
+            `;
+            
+            updateRoomState();
+        }
+        
+        function updateRoomState() {
+            if (!roomId) {
+                document.getElementById('room-state').innerHTML = '<div class="error">No room created</div>';
+                return;
+            }
+            
+            const room = gameRooms.get(roomId);
+            if (!room) {
+                document.getElementById('room-state').innerHTML = '<div class="error">Room not found</div>';
+                return;
+            }
+            
+            const players = room.players.map((playerId, index) => {
+                const profile = playerProfiles.get(playerId);
+                return {
+                    id: playerId,
+                    number: index + 1,
+                    nickname: profile?.nickname || `Player ${index + 1}`,
+                    isHost: playerId === room.hostId
+                };
+            });
+            
+            document.getElementById('room-state').innerHTML = `
+                <div class="success">Room State</div>
+                <strong>Room ID:</strong> ${roomId}<br>
+                <strong>Room State:</strong> ${room.gameState}<br>
+                <strong>Players:</strong> ${room.players.length}/${room.maxPlayers}<br><br>
+                <strong>Player Details:</strong><br>
+                ${players.map(p => `
+                    <div class="player-info">
+                        <div class="player-number">Player ${p.number}</div>
+                        <div class="player-nickname">${p.nickname}</div>
+                        <div>Socket ID: ${p.id}</div>
+                        <div>Host: ${p.isHost ? 'Yes' : 'No'}</div>
+                    </div>
+                `).join('')}
+            `;
+        }
+        
+        // Initialize
+        updateRoomState();
+    </script>
+</body>
+</html> 

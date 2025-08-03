@@ -834,6 +834,8 @@ function setupSocketEvents() {
   socket.on('gameJoined', (data) => {
     console.log('Joined game:', data);
     console.log('Player data received:', data.players);
+    console.log(`DEBUG: Client received player number: ${data.playerNumber}`);
+    console.log(`DEBUG: Client nickname from localStorage: ${gameState.playerNickname}`);
     gameState.playerNumber = data.playerNumber;
     gameState.players = data.players;
     gameState.maxPlayers = data.maxPlayers;
