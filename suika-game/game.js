@@ -78,6 +78,9 @@ function initializePlayerEngine(playerNum, canvasWidth = 800, canvasHeight = 600
   // Initialize world with canvas dimensions
   initializeWorld(engine.world, canvasWidth, canvasHeight);
   
+  // Start the physics engine
+  Runner.run(engine);
+  
   console.log(`Physics engine initialized for player ${playerNum} with canvas ${canvasWidth}x${canvasHeight}`);
 }
 
@@ -111,39 +114,7 @@ function initializeWorld(world, canvasWidth = 800, canvasHeight = 600) {
   console.log(`World initialized with walls at positions: left(15), right(${canvasWidth-15}), ground(${canvasHeight-30}), top(150)`);
 }
 
-// Create render for a player
-function createPlayerRender(playerNum, canvas) {
-  console.log(`Creating render for player ${playerNum}: canvas=${canvas.width}x${canvas.height}`);
-  
-  const render = Render.create({
-    engine: engines[playerNum],
-    canvas: canvas,
-    options: {
-      wireframes: true,          // Enable wireframes to debug viewport issues
-      background: "#F7f4C8",
-      width: canvas.width,
-      height: canvas.height,
-      pixelRatio: 'auto',
-      showDebug: false,
-      hasBounds: false
-    }
-  });
-  
-  renders[playerNum] = render;
-  Render.run(render);
-  Runner.run(engines[playerNum]);
-  
-  console.log(`Render created for player ${playerNum} with canvas size ${canvas.width}x${canvas.height}`);
-  
-  // Debug: Check if bodies are being rendered
-  setTimeout(() => {
-    const world = engines[playerNum].world;
-    console.log(`Player ${playerNum} world has ${world.bodies.length} bodies after render creation`);
-    world.bodies.forEach((body, index) => {
-      console.log(`Body ${index}: position(${body.position.x}, ${body.position.y}), render:`, body.render);
-    });
-  }, 1000);
-}
+
 
 // Add fruit to a player's game
 function addFruitToPlayer(playerNum, fruitIndex) {
@@ -337,13 +308,11 @@ function createMiniViewer(playerNum, playerData) {
   // Initialize physics for this player with main canvas dimensions (800x600)
   // This ensures consistent world coordinates across all players
   initializePlayerEngine(playerNum, 800, 600);
-  createPlayerRender(playerNum, canvas);
   
-  // Store original mini canvas for each player
-  if (!window.originalMiniCanvases) {
-    window.originalMiniCanvases = {};
-  }
-  window.originalMiniCanvases[playerNum] = canvas;
+  // Create simple mini render - no storage
+  const miniRender = createSimpleRender(engines[playerNum], canvas);
+  renders[playerNum] = miniRender;
+  Render.run(miniRender);
   
   // Add click handler to switch view
   viewerDiv.addEventListener('click', () => {
@@ -379,44 +348,50 @@ function updateMiniViewer(playerNum) {
 
 
 
-// Switch to player view
+// Simple render creation - no storage, no reuse
+function createSimpleRender(engine, canvas) {
+  return Render.create({
+    engine: engine,
+    canvas: canvas,
+    options: {
+      wireframes: true,
+      background: "#F7f4C8",
+      width: canvas.width,
+      height: canvas.height,
+      pixelRatio: 'auto',
+      showDebug: false,
+      hasBounds: false
+    }
+  });
+}
+
+// Switch to player view - simple approach
 function switchToPlayerView(playerNum) {
   if (gameState.currentView === playerNum) return;
   
   console.log(`Switching from player ${gameState.currentView} to player ${playerNum}`);
   
-  // Stop ALL current renders to avoid conflicts
+  // Stop and clear ALL renders completely
   Object.keys(renders).forEach(pNum => {
     const render = renders[pNum];
-    if (render && render.canvas === mainCanvas) {
-      console.log(`Stopping main canvas render for player ${pNum}`);
+    if (render) {
       Render.stop(render);
-      render.canvas = null;
+      delete renders[pNum];
     }
   });
   
   gameState.currentView = playerNum;
   
-  // Update main canvas to show this player's game
+  // Update main canvas
   mainCanvas.width = 800;
   mainCanvas.height = 600;
   
-  // Use the original render but redirect it to main canvas
-  const originalRender = renders[playerNum];
-  if (originalRender) {
-    // Stop the original render first
-    Render.stop(originalRender);
-    
-    // Redirect to main canvas
-    originalRender.canvas = mainCanvas;
-    originalRender.options.width = mainCanvas.width;
-    originalRender.options.height = mainCanvas.height;
-    
-    // Restart on main canvas
-    Render.run(originalRender);
-    
-    console.log(`Redirected player ${playerNum} render to main canvas`);
-  }
+  // Create one simple render for main canvas
+  const mainRender = createSimpleRender(engines[playerNum], mainCanvas);
+  renders[playerNum] = mainRender;
+  Render.run(mainRender);
+  
+  console.log(`Created simple render for player ${playerNum} on main canvas`);
   
   // Update UI
   const playerData = gameState.players.find(p => p.number === playerNum);
@@ -670,7 +645,11 @@ function setupSocketEvents() {
     mainCanvas.height = 600;
     // Initialize main player with canvas dimensions
     initializePlayerEngine(gameState.playerNumber, mainCanvas.width, mainCanvas.height);
-    createPlayerRender(gameState.playerNumber, mainCanvas);
+    
+    // Create initial main render
+    const initialRender = createSimpleRender(engines[gameState.playerNumber], mainCanvas);
+    renders[gameState.playerNumber] = initialRender;
+    Render.run(initialRender);
     
     // Create mini viewers for all players (including your own)
     data.players.forEach(player => {
