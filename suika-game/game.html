@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-Player Suika Game</title>
+    <link rel="stylesheet" href="game.css">
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <!-- Game Header -->
+        <header id="game-header">
+            <div class="header-left">
+                <h1>🍉 Suika Game</h1>
+                <div class="room-info">
+                    <span id="room-name">Room: Loading...</span>
+                    <span id="room-code">Code: ...</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div id="connection-status" class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connecting...</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="back-to-lobby" class="secondary">← Back to Lobby</button>
+            </div>
+        </header>
+
+        <!-- Main Game Area -->
+        <div id="game-layout">
+            <!-- Main Game Canvas (Your Game) -->
+            <div id="main-game-area">
+                <div class="game-header">
+                    <h2 id="main-player-name">Your Game</h2>
+                    <div class="game-controls">
+                        <span id="main-score">Score: 0</span>
+                        <span id="main-next-fruit">Next: 🍒</span>
+                    </div>
+                </div>
+                <canvas id="main-canvas"></canvas>
+                <div class="game-instructions">
+                    <p>🎮 <strong>Controls:</strong> Move mouse to position fruit, click to drop</p>
+                    <p>🏆 <strong>Goal:</strong> Create a watermelon to win!</p>
+                </div>
+            </div>
+
+            <!-- Mini Viewers (Other Players) -->
+            <div id="mini-viewers">
+                <h3>Other Players</h3>
+                <div id="viewers-container">
+                    <!-- Mini viewers will be dynamically added here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Status -->
+        <div id="game-status">
+            <div id="current-viewer" class="viewer-indicator">
+                <span>👁️ Currently viewing: <strong>Your Game</strong></span>
+            </div>
+            <div id="game-message" class="game-message">
+                <span>Waiting for game to start...</span>
+            </div>
+        </div>
+
+        <!-- Win Modal -->
+        <div id="win-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="win-title">🎉 Congratulations!</h2>
+                <p id="win-message">You created a watermelon and won the game!</p>
+                <div id="win-details">
+                    <p><strong>Final Score:</strong> <span id="win-score">0</span></p>
+                    <p><strong>Watermelons:</strong> <span id="win-watermelons">0</span></p>
+                </div>
+                <div class="modal-buttons">
+                    <button id="play-again" class="success">Play Again</button>
+                    <button id="back-lobby" class="secondary">Back to Lobby</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="loading-overlay">
+            <div class="loading-content">
+                <h2>🍉 Loading Suika Game...</h2>
+                <div class="loading-spinner"></div>
+                <p id="loading-message">Connecting to game server...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="game.js"></script>
+</body>
+</html> 

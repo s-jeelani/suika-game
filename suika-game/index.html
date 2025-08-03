@@ -3,47 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Suika Game</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <title>Suika Game - Redirecting to Lobby</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+        .redirect-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-    <div id="game-wrapper">
-        <!-- Scoreboards -->
-        <div id="scoreboard">
-            <div id="player1-score" class="score">Player 1: 0</div>
-            <div id="player2-score" class="score">Player 2: 0</div>
-        </div>
-        
-        <!-- Game containers -->
-        <div id="game-container">
-            <div id="player1-game" class="game-side">
-                <canvas id="player1-canvas"></canvas>
-                <div id="player1-next" class="next-fruit">
-                    <h3>Player 1 - Next Fruit</h3>
-                    <div id="player1-next-fruit"></div>
-                </div>
-            </div>
-            <div id="player2-game" class="game-side">
-                <canvas id="player2-canvas"></canvas>
-                <div id="player2-next" class="next-fruit">
-                    <h3>Player 2 - Next Fruit</h3>
-                    <div id="player2-next-fruit"></div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Connection status -->
-        <div id="connection-status">Connecting...</div>
-        <div id="turn-indicator">Waiting for game to start...</div>
-        
-        <!-- Game controls -->
-                    <div id="game-controls">
-                <button id="join-game">Join Game</button>
-                <input type="text" id="room-id" placeholder="Enter Room ID" value="room1">
-                <button id="new-room">New Room</button>
-            </div>
+    <div class="redirect-container">
+        <h1>🍉 Suika Game</h1>
+        <p>Redirecting to the new lobby system...</p>
+        <div class="spinner"></div>
+        <p>If you're not redirected automatically, <a href="lobby.html" style="color: #ffd700;">click here</a></p>
     </div>
-    <script type="module" src="multiplayer.js"></script>
+    
+    <script>
+        // Redirect to lobby after a short delay
+        setTimeout(() => {
+            window.location.href = 'lobby.html';
+        }, 2000);
+    </script>
 </body>
 </html>

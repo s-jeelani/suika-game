@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suika Game Lobby</title>
+    <link rel="stylesheet" href="lobby.css">
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div id="lobby-container">
+        <!-- Header -->
+        <header id="lobby-header">
+            <h1>🍉 Suika Game Lobby</h1>
+            <div id="connection-status" class="status-indicator">
+                <span class="status-dot"></span>
+                <span class="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Player Profile Section -->
+        <section id="player-profile">
+            <h2>Your Profile</h2>
+            <div class="profile-form">
+                <label for="nickname">Nickname:</label>
+                <input type="text" id="nickname" placeholder="Enter your nickname" maxlength="20">
+                <button id="update-profile">Update Profile</button>
+            </div>
+        </section>
+
+        <!-- Room Management Section -->
+        <section id="room-management">
+            <h2>Room Management</h2>
+            
+            <!-- Create Room -->
+            <div class="room-section">
+                <h3>Create New Room</h3>
+                <div class="room-form">
+                    <label for="room-name">Room Name:</label>
+                    <input type="text" id="room-name" placeholder="Enter room name" maxlength="30">
+                    <label for="max-players">Max Players:</label>
+                    <select id="max-players">
+                        <option value="2">2 Players</option>
+                        <option value="3">3 Players</option>
+                        <option value="4" selected>4 Players</option>
+                    </select>
+                    <button id="create-room">Create Room</button>
+                </div>
+            </div>
+
+            <!-- Join Room -->
+            <div class="room-section">
+                <h3>Join Existing Room</h3>
+                <div class="room-form">
+                    <label for="room-code">Room Code:</label>
+                    <input type="text" id="room-code" placeholder="Enter room code">
+                    <button id="join-room">Join Room</button>
+                </div>
+            </div>
+
+            <!-- Current Room Info -->
+            <div id="current-room" class="room-section" style="display: none;">
+                <h3>Current Room</h3>
+                <div class="room-info">
+                    <p><strong>Room:</strong> <span id="room-name-display"></span></p>
+                    <p><strong>Code:</strong> <span id="room-code-display"></span></p>
+                    <p><strong>Players:</strong> <span id="player-count">0</span>/<span id="max-players-display">4</span></p>
+                    <button id="leave-room">Leave Room</button>
+                    <button id="start-game" disabled>Start Game</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Players List -->
+        <section id="players-list">
+            <h2>Players in Room</h2>
+            <div id="players-container">
+                <p class="no-players">No players in room yet</p>
+            </div>
+        </section>
+
+        <!-- Available Rooms -->
+        <section id="available-rooms">
+            <h2>Available Rooms</h2>
+            <button id="refresh-rooms">Refresh</button>
+            <div id="rooms-container">
+                <p class="no-rooms">No rooms available</p>
+            </div>
+        </section>
+
+        <!-- Game Launch Section -->
+        <section id="game-launch" style="display: none;">
+            <h2>Game Ready!</h2>
+            <div class="launch-info">
+                <p>All players are ready. Click to start the game!</p>
+                <button id="launch-game">Launch Suika Game</button>
+            </div>
+        </section>
+    </div>
+
+    <script type="module" src="lobby.js"></script>
+</body>
+</html> 
