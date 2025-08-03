@@ -28,18 +28,11 @@ const renders = {};
 const gameStates = {};
 
 // DOM elements
-let connectionStatus = null;
-let statusDot = null;
-let statusText = null;
-let roomName = null;
-let roomCode = null;
-let backToLobbyBtn = null;
 let mainPlayerName = null;
 let mainScore = null;
 let mainNextFruit = null;
 let mainCanvas = null;
 let viewersContainer = null;
-let currentViewerName = null;
 let winModal = null;
 let loadingScreen = null;
 let loadingMessage = null;
@@ -51,7 +44,6 @@ function initializeDOMElements() {
   mainNextFruit = document.getElementById('main-next-fruit');
   mainCanvas = document.getElementById('main-canvas');
   viewersContainer = document.getElementById('viewers-container');
-  currentViewerName = document.getElementById('current-viewer-name');
   winModal = document.getElementById('win-modal');
   loadingScreen = document.getElementById('loading-screen');
   loadingMessage = document.getElementById('loading-message');
@@ -62,7 +54,7 @@ function initializeDOMElements() {
 
 
 // Initialize physics engine for a player
-function initializePlayerEngine(playerNum, canvasWidth = 600, canvasHeight = 400) {
+function initializePlayerEngine(playerNum, canvasWidth = 800, canvasHeight = 600) {
   const engine = Engine.create();
   engine.world.gravity.y = 1;
   engine.world.gravity.scale = 0.001;
@@ -92,7 +84,7 @@ function initializePlayerEngine(playerNum, canvasWidth = 600, canvasHeight = 400
 }
 
 // Initialize world with walls
-function initializeWorld(world, canvasWidth = 600, canvasHeight = 400) {
+function initializeWorld(world, canvasWidth = 800, canvasHeight = 600) {
   console.log(`Initializing world with dimensions: ${canvasWidth}x${canvasHeight}`);
   
   const leftWall = Bodies.rectangle(15, canvasHeight/2, 30, canvasHeight, {
@@ -169,7 +161,6 @@ function addFruitToPlayer(playerNum, fruitIndex) {
     index: fruitIndex,
     isSleeping: true,
     render: {
-      fillStyle: '#FF0000', // Red color for debugging
       sprite: { 
         texture: `/${fruit.name}.png`,
         xScale: 1,
@@ -345,9 +336,9 @@ function createMiniViewer(playerNum, playerData) {
   
   viewersContainer.appendChild(viewerDiv);
   
-  // Initialize physics for this player with main canvas dimensions (600x400)
+  // Initialize physics for this player with main canvas dimensions (800x600)
   // This ensures consistent world coordinates across all players
-  initializePlayerEngine(playerNum, 600, 400);
+  initializePlayerEngine(playerNum, 800, 600);
   createPlayerRender(playerNum, canvas);
   
   // Add click handler to switch view
@@ -391,8 +382,8 @@ function switchToPlayerView(playerNum) {
   const targetCanvas = document.getElementById(`canvas-${playerNum}`);
   if (targetCanvas) {
     // Always use the main canvas size for consistent display
-    mainCanvas.width = 600;
-    mainCanvas.height = 400;
+    mainCanvas.width = 800;
+    mainCanvas.height = 600;
     
     // Copy the render to main canvas and update render options
     const render = renders[playerNum];
@@ -412,7 +403,6 @@ function switchToPlayerView(playerNum) {
   const playerData = gameState.players.find(p => p.number === playerNum);
   if (playerData) {
     mainPlayerName.textContent = `${playerData.nickname}'s Game`;
-    currentViewerName.textContent = `${playerData.nickname}'s Game`;
   }
   
   // Update active state
@@ -649,9 +639,9 @@ function setupSocketEvents() {
     gameState.players = data.players;
     gameState.maxPlayers = data.maxPlayers;
     
-    // Set main canvas to larger size for better zoomed out effect
-    mainCanvas.width = 600;
-    mainCanvas.height = 400;
+    // Set main canvas to much larger size for better visibility
+    mainCanvas.width = 800;
+    mainCanvas.height = 600;
     // Initialize main player with canvas dimensions
     initializePlayerEngine(gameState.playerNumber, mainCanvas.width, mainCanvas.height);
     createPlayerRender(gameState.playerNumber, mainCanvas);
