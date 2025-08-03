@@ -51,7 +51,13 @@ app.get('/rooms', (req, res) => {
     lastHealthChecks: room.healthChecks ? Object.keys(room.healthChecks).map(player => ({
       player,
       lastCheck: new Date(room.healthChecks[player].timestamp).toISOString()
-    })) : []
+    })) : [],
+    winner: room.winner ? {
+      playerNumber: room.winner.playerNumber,
+      score: room.winner.score,
+      num_suika: room.winner.num_suika,
+      wonAt: room.winner.wonAt
+    } : null
   }));
   res.json({ rooms, totalRooms: rooms.length });
 });
@@ -136,6 +142,7 @@ io.on('connection', (socket) => {
         randomSeed: null,
         playerStates: {},
         healthChecks: {},
+        winner: null,
         createdAt: new Date().toISOString()
       });
       console.log('Created new room:', roomId);
@@ -178,6 +185,7 @@ io.on('connection', (socket) => {
       // Start game only when exactly 2 players
       if (room.players.length === 2) {
         room.gameState = 'playing';
+        room.winner = null; // Reset winner for new game
         
         // Generate a shared random seed for synchronized randomness
         const randomSeed = Math.floor(Math.random() * 1000000);
@@ -286,6 +294,36 @@ io.on('connection', (socket) => {
   socket.on('syncState', ({ roomId, gameStates }) => {
     console.log(`🔄 Legacy sync state received from room ${roomId}`);
     // Could be used for additional monitoring or fallback sync
+  });
+
+  // Handle player win events (watermelon created)
+  socket.on('playerWon', ({ roomId, playerNumber, score, num_suika }) => {
+    console.log(`🏆 Player ${playerNumber} won the game in room ${roomId}!`);
+    console.log(`Final score: ${score}, Watermelons: ${num_suika}`);
+    
+    const room = gameRooms.get(roomId);
+    if (room) {
+      // Mark game as finished
+      room.gameState = 'finished';
+      room.winner = {
+        playerNumber: playerNumber,
+        score: score,
+        num_suika: num_suika,
+        wonAt: new Date().toISOString()
+      };
+      
+      // Broadcast win event to all players in the room
+      io.to(roomId).emit('gameWon', {
+        winnerPlayerNumber: playerNumber,
+        winnerScore: score,
+        num_suika: num_suika,
+        roomId: roomId
+      });
+      
+      console.log(`✅ Game win broadcasted to room ${roomId}`);
+    } else {
+      console.log(`❌ Room ${roomId} not found for win event`);
+    }
   });
 
   // Removed game over handler - games continue indefinitely

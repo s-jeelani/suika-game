@@ -509,11 +509,18 @@ function updateTurnIndicator() {
     return;
   }
   
+  // Check if game is over
+  if (gameStates.player1.disableAction && gameStates.player2.disableAction) {
+    turnIndicator.textContent = '🏆 Game Over - Someone created a WATERMELON!';
+    turnIndicator.style.backgroundColor = '#FF9800';
+    return;
+  }
+  
   if (myPlayerNumber === 1) {
-    turnIndicator.textContent = 'You control the LEFT side (Player 1). Compete against the right side!';
+    turnIndicator.textContent = 'You control the LEFT side (Player 1). Create a WATERMELON to win!';
     turnIndicator.style.backgroundColor = '#4CAF50';
   } else if (myPlayerNumber === 2) {
-    turnIndicator.textContent = 'You control the RIGHT side (Player 2). Compete against the left side!';
+    turnIndicator.textContent = 'You control the RIGHT side (Player 2). Create a WATERMELON to win!';
     turnIndicator.style.backgroundColor = '#4CAF50';
   } else {
     turnIndicator.textContent = 'Invalid player number - refresh page';
@@ -613,6 +620,11 @@ function handleMouseMove(event, playerNum) {
     return;
   }
   
+  // Check if game is over
+  if (gameState.disableAction) {
+    return;
+  }
+  
   const canvas = playerNum === 1 ? render1.canvas : render2.canvas;
   const rect = canvas.getBoundingClientRect();
   const x = event.clientX - rect.left;
@@ -640,6 +652,12 @@ function handleClick(event, playerNum) {
   // Only allow dropping if this is my assigned player
   if (playerNum !== myPlayerNumber) {
     console.log(`Ignoring click - not my player`);
+    return;
+  }
+  
+  // Check if game is over
+  if (gameStates[`player${playerNum}`].disableAction) {
+    console.log(`Game is over - cannot drop fruit`);
     return;
   }
   
@@ -757,7 +775,31 @@ function handleCollision(event, playerNum) {
 
       if (collision.bodyA.index === 9 && collision.bodyB.index === 9) {
         gameState.num_suika++;
-        // Continue playing even after creating watermelons
+        
+        // Check if this creates a watermelon (index 10)
+        if (index + 1 === 10) {
+          console.log(`🎉 Player ${playerNum} created a WATERMELON! Game Over!`);
+          
+          // Send win event to server
+          socket.emit('playerWon', { 
+            roomId, 
+            playerNumber: playerNum,
+            score: gameState.score,
+            num_suika: gameState.num_suika
+          });
+          
+          // Show win message locally
+          if (playerNum === myPlayerNumber) {
+            alert('🎉 CONGRATULATIONS! You created a WATERMELON and WON the game!');
+          } else {
+            alert('🏆 Your opponent created a WATERMELON and won the game!');
+          }
+          
+          // Disable further actions
+          gameState.disableAction = true;
+          gameStates.player1.disableAction = true;
+          gameStates.player2.disableAction = true;
+        }
       }
     }
 
@@ -803,6 +845,16 @@ function setupSocketEvents() {
   socket.on('gameStart', (data) => {
     console.log('Received gameStart event:', data);
     gameStarted = true;
+    
+    // Reset game states for new game
+    gameStates.player1.disableAction = false;
+    gameStates.player2.disableAction = false;
+    gameStates.player1.score = 0;
+    gameStates.player2.score = 0;
+    gameStates.player1.placementCount = 0;
+    gameStates.player2.placementCount = 0;
+    gameStates.player1.num_suika = 0;
+    gameStates.player2.num_suika = 0;
     
     // Initialize synced random with server-provided seed
     if (data.randomSeed) {
@@ -916,6 +968,34 @@ socket.on('newFruit', (data) => {
   // Only add fruit if this is NOT my player (I already added mine locally)
   if (data.playerNumber !== myPlayerNumber) {
     addFruitWithIndex(data.playerNumber, data.fruitIndex);
+  }
+});
+
+// Handle game win events
+socket.on('gameWon', (data) => {
+  console.log('🏆 Game won event received:', data);
+  
+  // Disable all actions for both players
+  gameStates.player1.disableAction = true;
+  gameStates.player2.disableAction = true;
+  
+  // Show appropriate win message
+  if (data.winnerPlayerNumber === myPlayerNumber) {
+    alert(`🎉 CONGRATULATIONS! You created a WATERMELON and WON the game!\nFinal Score: ${data.winnerScore}\nWatermelons Created: ${data.num_suika}`);
+  } else {
+    alert(`🏆 Your opponent created a WATERMELON and won the game!\nTheir Score: ${data.winnerScore}\nWatermelons Created: ${data.num_suika}`);
+  }
+  
+  // Update turn indicator
+  if (turnIndicator) {
+    turnIndicator.textContent = `🏆 Game Over - ${data.winnerPlayerNumber === myPlayerNumber ? 'YOU WON!' : 'Opponent Won!'}`;
+    turnIndicator.style.backgroundColor = data.winnerPlayerNumber === myPlayerNumber ? '#4CAF50' : '#f44336';
+  }
+  
+  // Update connection status
+  if (connectionStatus) {
+    connectionStatus.textContent = `🏆 Game Complete - ${data.winnerPlayerNumber === myPlayerNumber ? 'Victory!' : 'Defeat'}`;
+    connectionStatus.style.backgroundColor = data.winnerPlayerNumber === myPlayerNumber ? '#4CAF50' : '#f44336';
   }
 });
 
