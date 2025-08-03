@@ -592,9 +592,9 @@ io.on('connection', (socket) => {
     }
     
     // Always use the player's actual index for their number
-    const playerNumber = playerIndex + 1;
+    let assignedPlayerNumber = playerIndex + 1;
     
-    console.log(`DEBUG: Player ${socket.id} (${nickname}) assigned player number ${playerNumber} (index in array: ${playerIndex})`);
+    console.log(`DEBUG: Player ${socket.id} (${nickname}) assigned player number ${assignedPlayerNumber} (index in array: ${playerIndex})`);
     console.log(`DEBUG: Room players:`, room.players);
     console.log(`DEBUG: All player profiles:`, Array.from(playerProfiles.entries()));
     
@@ -610,11 +610,11 @@ io.on('connection', (socket) => {
     });
     
     console.log(`DEBUG: Final players list:`, players);
-    console.log(`DEBUG: Sending gameJoined to player ${socket.id} with player number ${playerNumber}`);
+    console.log(`DEBUG: Sending gameJoined to player ${socket.id} with player number ${assignedPlayerNumber}`);
     
     socket.emit('gameJoined', {
       roomId,
-      playerNumber,
+      playerNumber: assignedPlayerNumber,
       players,
       maxPlayers: room.maxPlayers,
       randomSeed: room.randomSeed
