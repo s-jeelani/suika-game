@@ -315,12 +315,8 @@ function createMiniViewer(playerNum, playerData) {
   const viewerDiv = document.createElement('div');
   viewerDiv.className = 'mini-viewer';
   viewerDiv.id = `viewer-${playerNum}`;
-  
-  const canvas = document.createElement('canvas');
-  canvas.width = 300;
-  canvas.height = 150;
-  canvas.id = `canvas-${playerNum}`;
-  
+
+  // Build the viewer HTML (including the canvas that will actually be in the DOM)
   viewerDiv.innerHTML = `
     <div class="mini-viewer-header">
       <div class="mini-viewer-name">${playerData.nickname}</div>
@@ -329,24 +325,36 @@ function createMiniViewer(playerNum, playerData) {
     <canvas id="canvas-${playerNum}" width="300" height="150"></canvas>
     <div class="mini-viewer-status" id="status-${playerNum}">Waiting...</div>
   `;
-  
+
+  // Append to DOM *before* we start rendering so the canvas is present
   viewersContainer.appendChild(viewerDiv);
-  
-  // Initialize physics for this player with main canvas dimensions (400x600)
-  // This ensures consistent world coordinates across all players
+
+  // Grab the canvas that now exists inside the viewer
+  const canvas = viewerDiv.querySelector('canvas');
+
+  // Initialize physics for this player (use main-game dimensions for consistency)
   initializePlayerEngine(playerNum, 400, 600);
-  
-  // Create simple mini render - no storage
+
+  // Create and run the Matter.js render on the **actual** DOM canvas
   const miniRender = createSimpleRender(engines[playerNum], canvas);
   renders[playerNum] = miniRender;
   Render.run(miniRender);
-  
-  // Add click handler to switch view
+
+  // Allow clicking the mini-viewer to switch the main view
   viewerDiv.addEventListener('click', () => {
     console.log(`Clicked on player ${playerNum} mini viewer`);
     switchToPlayerView(playerNum);
   });
-  
+
+  // Immediately request the opponent's full state so their objects & score appear
+  if (playerNum !== gameState.playerNumber && gameState.roomId) {
+    console.log(`Requesting immediate complete state for player ${playerNum}`);
+    socket.emit('requestCompleteState', {
+      roomId: gameState.roomId,
+      requestedPlayerNumber: playerNum
+    });
+  }
+
   console.log(`Mini viewer created for player ${playerNum}: ${playerData.nickname}`);
 }
 
