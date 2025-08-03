@@ -43,7 +43,15 @@ app.get('/rooms', (req, res) => {
     roomId,
     playerCount: room.players.length,
     players: room.players,
-    gameState: room.gameState
+    gameState: room.gameState,
+    randomSeed: room.randomSeed,
+    scores: room.scores,
+    createdAt: room.createdAt,
+    hasPlayerStates: Object.keys(room.playerStates || {}).length,
+    lastHealthChecks: room.healthChecks ? Object.keys(room.healthChecks).map(player => ({
+      player,
+      lastCheck: new Date(room.healthChecks[player].timestamp).toISOString()
+    })) : []
   }));
   res.json({ rooms, totalRooms: rooms.length });
 });
@@ -53,6 +61,47 @@ app.post('/clear-rooms', (req, res) => {
   gameRooms.clear();
   playerScores.clear();
   res.json({ message: 'All rooms cleared' });
+});
+
+// Debug endpoint for sync states
+app.get('/sync-debug/:roomId?', (req, res) => {
+  const { roomId } = req.params;
+  
+  if (roomId) {
+    // Get specific room sync info
+    const room = gameRooms.get(roomId);
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+    
+    res.json({
+      roomId,
+      gameState: room.gameState,
+      randomSeed: room.randomSeed,
+      playerStates: room.playerStates || {},
+      healthChecks: room.healthChecks || {},
+      players: room.players,
+      scores: room.scores
+    });
+  } else {
+    // Get all sync info
+    const syncInfo = Array.from(gameRooms.entries()).map(([roomId, room]) => ({
+      roomId,
+      gameState: room.gameState,
+      randomSeed: room.randomSeed,
+      playerStateCount: Object.keys(room.playerStates || {}).length,
+      healthCheckCount: Object.keys(room.healthChecks || {}).length,
+      lastSyncStates: room.playerStates ? Object.keys(room.playerStates).map(player => ({
+        player,
+        placementCount: room.playerStates[player].placementCount,
+        bodyCount: room.playerStates[player].bodies?.length || 0,
+        score: room.playerStates[player].score,
+        receivedAt: room.playerStates[player].receivedAt
+      })) : []
+    }));
+    
+    res.json({ syncInfo, totalRooms: syncInfo.length });
+  }
 });
 
 // Add connection debugging
@@ -83,7 +132,11 @@ io.on('connection', (socket) => {
       gameRooms.set(roomId, {
         players: [],
         scores: { player1Score: 0, player2Score: 0 },
-        gameState: 'waiting'
+        gameState: 'waiting',
+        randomSeed: null,
+        playerStates: {},
+        healthChecks: {},
+        createdAt: new Date().toISOString()
       });
       console.log('Created new room:', roomId);
     }
@@ -125,10 +178,16 @@ io.on('connection', (socket) => {
       // Start game only when exactly 2 players
       if (room.players.length === 2) {
         room.gameState = 'playing';
-        console.log('Starting game with 2 players');
+        
+        // Generate a shared random seed for synchronized randomness
+        const randomSeed = Math.floor(Math.random() * 1000000);
+        room.randomSeed = randomSeed;
+        
+        console.log('Starting game with 2 players, random seed:', randomSeed);
         io.to(roomId).emit('gameStart', {
           player1: room.players[0],
-          player2: room.players[1]
+          player2: room.players[1],
+          randomSeed: randomSeed
         });
       } else {
         // Notify waiting for more players
@@ -175,6 +234,58 @@ io.on('connection', (socket) => {
   socket.on('generateNewFruit', ({ roomId, playerNumber, fruitIndex }) => {
     // Broadcast to other players in the room
     socket.to(roomId).emit('newFruit', { playerNumber, fruitIndex });
+  });
+
+  // Handle complete game state synchronization (every 5 placements)
+  socket.on('completeGameState', ({ roomId, gameState }) => {
+    console.log(`📦 Received complete game state from player ${gameState.playerNumber} in room ${roomId}`);
+    console.log(`State contains ${gameState.bodies.length} bodies, score: ${gameState.score}, placements: ${gameState.placementCount}`);
+    
+    const room = gameRooms.get(roomId);
+    if (room && room.gameState === 'playing') {
+      // Store the state in the room for potential debugging
+      if (!room.playerStates) {
+        room.playerStates = {};
+      }
+      room.playerStates[`player${gameState.playerNumber}`] = {
+        ...gameState,
+        receivedAt: new Date().toISOString()
+      };
+      
+      // Forward the complete state to the opponent
+      socket.to(roomId).emit('opponentCompleteState', { 
+        gameState: gameState,
+        timestamp: Date.now()
+      });
+      
+      console.log(`✅ Forwarded complete state for player ${gameState.playerNumber} to opponent`);
+    } else {
+      console.log(`❌ Room ${roomId} not found or game not in playing state`);
+    }
+  });
+
+  // Handle sync health checks
+  socket.on('syncHealthCheck', ({ roomId, playerNumber, timestamp }) => {
+    const room = gameRooms.get(roomId);
+    if (room) {
+      console.log(`💓 Health check from player ${playerNumber} in room ${roomId} at ${new Date(timestamp).toISOString()}`);
+      
+      // Optional: Store health check info for monitoring
+      if (!room.healthChecks) {
+        room.healthChecks = {};
+      }
+      room.healthChecks[`player${playerNumber}`] = {
+        timestamp: timestamp,
+        socketId: socket.id,
+        receivedAt: Date.now()
+      };
+    }
+  });
+
+  // Handle legacy sync state (for compatibility)
+  socket.on('syncState', ({ roomId, gameStates }) => {
+    console.log(`🔄 Legacy sync state received from room ${roomId}`);
+    // Could be used for additional monitoring or fallback sync
   });
 
   // Removed game over handler - games continue indefinitely

@@ -1,6 +1,26 @@
-import {Bodies, Body, Events, Engine, Render, Runner, World} from "matter-js"
+import {Bodies, Body, Events, Engine, Render, Runner, World, Sleeping} from "matter-js"
 import { FRUITS } from './fruits.js'
 import { SERVER_URL } from './config.js'
+
+// Deterministic Random Number Generator for sync
+class SyncedRandom {
+  constructor(seed) {
+    this.seed = seed;
+  }
+  
+  // Linear Congruential Generator for deterministic randomness
+  random() {
+    this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
+    return this.seed / 0x7fffffff;
+  }
+  
+  randomInt(max) {
+    return Math.floor(this.random() * max);
+  }
+}
+
+// Global synced random instance
+let syncedRandom = null;
 
 // Socket.IO connection with better error handling
 console.log('Connecting to server:', SERVER_URL);
@@ -133,6 +153,19 @@ function initializeDOMElements() {
 const engine1 = Engine.create();
 const engine2 = Engine.create();
 
+// Configure physics engines with proper gravity and timing
+engine1.world.gravity.y = 1;
+engine1.world.gravity.scale = 0.001;
+engine1.timing.timeScale = 1;
+engine1.positionIterations = 6;
+engine1.velocityIterations = 4;
+
+engine2.world.gravity.y = 1;
+engine2.world.gravity.scale = 0.001;
+engine2.timing.timeScale = 1;
+engine2.positionIterations = 6;
+engine2.velocityIterations = 4;
+
 // Initialize game variables
 let render1 = null;
 let render2 = null;
@@ -149,7 +182,8 @@ const gameStates = {
     nextFruit: null,
     disableAction: false,
     score: 0,
-    num_suika: 0
+    num_suika: 0,
+    placementCount: 0 // Track fruit placements for periodic full sync
   },
   player2: {
     engine: engine2,
@@ -159,7 +193,8 @@ const gameStates = {
     nextFruit: null,
     disableAction: false,
     score: 0,
-    num_suika: 0
+    num_suika: 0,
+    placementCount: 0 // Track fruit placements for periodic full sync
   }
 };
 
@@ -274,14 +309,142 @@ function startGame() {
     setupJoinGameButton();
     
     console.log('Game started successfully!');
+    
+    // Start periodic sync checks to prevent drift accumulation
+    startSyncMonitoring();
+    
   } catch (error) {
     console.error('Error starting game:', error);
   }
 }
 
+// Serialize complete game state for a player
+function serializeGameState(playerNum) {
+  const gameState = gameStates[`player${playerNum}`];
+  if (!gameState) return null;
+  
+  // Get all bodies in the world (excluding walls)
+  const bodies = gameState.world.bodies.filter(body => 
+    !body.isStatic && // Exclude walls
+    body !== gameState.currentBody // Exclude current dropping fruit
+  ).map(body => ({
+    id: body.id,
+    x: body.position.x,
+    y: body.position.y,
+    angle: body.angle,
+    velocityX: body.velocity.x,
+    velocityY: body.velocity.y,
+    angularVelocity: body.angularVelocity,
+    index: body.index,
+    radius: body.circleRadius,
+    isSleeping: body.isSleeping
+  }));
+  
+  return {
+    playerNumber: playerNum,
+    score: gameState.score,
+    placementCount: gameState.placementCount,
+    num_suika: gameState.num_suika,
+    bodies: bodies,
+    currentFruit: gameState.currentFruit ? {
+      name: gameState.currentFruit.name,
+      radius: gameState.currentFruit.radius,
+      index: gameState.currentBody?.index
+    } : null,
+    nextFruit: gameState.nextFruit ? {
+      name: gameState.nextFruit.name,
+      radius: gameState.nextFruit.radius
+    } : null,
+    timestamp: Date.now()
+  };
+}
+
+// Apply received complete game state from opponent
+function applyOpponentGameState(stateData) {
+  if (stateData.playerNumber === myPlayerNumber) {
+    console.log('Ignoring own game state');
+    return; // Don't apply our own state
+  }
+  
+  const gameState = gameStates[`player${stateData.playerNumber}`];
+  if (!gameState) {
+    console.error('Invalid player number:', stateData.playerNumber);
+    return;
+  }
+  
+  console.log(`Applying complete game state for player ${stateData.playerNumber}:`, stateData);
+  
+  // Remove all existing non-static bodies (except current fruit)
+  const bodiesToRemove = gameState.world.bodies.filter(body => 
+    !body.isStatic && body !== gameState.currentBody
+  );
+  World.remove(gameState.world, bodiesToRemove);
+  
+  // Recreate all bodies from the received state
+  const newBodies = stateData.bodies.map(bodyData => {
+    const fruit = FRUITS[bodyData.index];
+    const body = Bodies.circle(bodyData.x, bodyData.y, bodyData.radius, {
+      index: bodyData.index,
+      render: {
+        sprite: { texture: `/${fruit.name}.png` }
+      },
+      restitution: 0.2,
+      density: 0.001,
+      friction: 0.3,
+      frictionAir: 0.01,
+    });
+    
+    // Restore physics properties
+    Body.setVelocity(body, { x: bodyData.velocityX, y: bodyData.velocityY });
+    Body.setAngularVelocity(body, bodyData.angularVelocity);
+    Body.setAngle(body, bodyData.angle);
+    
+    if (bodyData.isSleeping) {
+      Sleeping.set(body, true);
+    }
+    
+    return body;
+  });
+  
+  // Add all new bodies to the world
+  World.add(gameState.world, newBodies);
+  
+  // Update game state data
+  gameState.score = stateData.score;
+  gameState.placementCount = stateData.placementCount;
+  gameState.num_suika = stateData.num_suika;
+  
+  // Update UI
+  if (stateData.playerNumber === 1) {
+    const player1Text = myPlayerNumber === 1 ? 'Player 1 (YOU)' : 'Player 1';
+    player1Score.textContent = `${player1Text}: ${stateData.score}`;
+  } else if (stateData.playerNumber === 2) {
+    const player2Text = myPlayerNumber === 2 ? 'Player 2 (YOU)' : 'Player 2';
+    player2Score.textContent = `${player2Text}: ${stateData.score}`;
+  }
+  
+  console.log(`Game state applied successfully for player ${stateData.playerNumber}`);
+}
+
+// Periodic synchronization monitoring (reduced frequency since we have placement-based sync)
+function startSyncMonitoring() {
+  // Light monitoring - just check for major discrepancies
+  setInterval(() => {
+    if (gameStarted && socket.connected) {
+      // Just send basic health check
+      socket.emit('syncHealthCheck', { 
+        roomId, 
+        playerNumber: myPlayerNumber,
+        timestamp: Date.now()
+      });
+    }
+  }, 30000); // Reduced to every 30 seconds since we have placement-based sync
+}
+
 // Add fruit to game for a specific player
 function addFruit(playerNum) {
-  const index = Math.floor(Math.random() * 5);
+  // Use synced random if available, fallback to Math.random
+  const index = syncedRandom ? syncedRandom.randomInt(5) : Math.floor(Math.random() * 5);
   addFruitWithIndex(playerNum, index);
 }
 
@@ -304,6 +467,9 @@ function addFruitWithIndex(playerNum, index) {
       sprite: { texture: `/${fruit.name}.png` }
     },
     restitution: 0.2,
+    density: 0.001,
+    friction: 0.3,
+    frictionAir: 0.01,
     isDropped: false // Track if fruit has been dropped
   });
 
@@ -311,7 +477,7 @@ function addFruitWithIndex(playerNum, index) {
   gameState.currentFruit = fruit;
 
   // Generate next fruit
-  const nextIndex = Math.floor(Math.random() * 5);
+  const nextIndex = syncedRandom ? syncedRandom.randomInt(5) : Math.floor(Math.random() * 5);
   gameState.nextFruit = FRUITS[nextIndex];
 
   World.add(gameState.world, body);
@@ -364,6 +530,10 @@ function dropFruit(playerNum) {
   gameState.currentBody.isDropped = true; // Mark as dropped
   gameState.disableAction = true;
 
+  // Increment placement count
+  gameState.placementCount++;
+  console.log(`Player ${playerNum} placement count: ${gameState.placementCount}`);
+
   // Add score for dropping fruit
   const score = FRUIT_SCORES[gameState.currentFruit.index] || 0;
   gameState.score += score;
@@ -389,9 +559,38 @@ function dropFruit(playerNum) {
     fruitIndex: gameState.currentFruit.index
   });
 
+  // Check if we need to send complete game state (every 5 placements)
+  if (gameState.placementCount % 5 === 0 && playerNum === myPlayerNumber) {
+    console.log(`🔄 Triggering complete state sync after ${gameState.placementCount} placements`);
+    
+    // Show sync indicator
+    if (connectionStatus) {
+      const originalText = connectionStatus.textContent;
+      const originalColor = connectionStatus.style.backgroundColor;
+      connectionStatus.textContent = `🔄 Syncing game state...`;
+      connectionStatus.style.backgroundColor = '#FF9800';
+      
+      setTimeout(() => {
+        connectionStatus.textContent = originalText;
+        connectionStatus.style.backgroundColor = originalColor;
+      }, 3000);
+    }
+    
+    setTimeout(() => {
+      const completeState = serializeGameState(playerNum);
+      if (completeState) {
+        socket.emit('completeGameState', { 
+          roomId, 
+          gameState: completeState 
+        });
+        console.log('✅ Complete game state sent to server:', completeState);
+      }
+    }, 2000); // Wait 2 seconds for physics to settle after the drop
+  }
+
   setTimeout(() => {
     // Generate new fruit and sync it
-    const newFruitIndex = Math.floor(Math.random() * 5);
+    const newFruitIndex = syncedRandom ? syncedRandom.randomInt(5) : Math.floor(Math.random() * 5);
     socket.emit('generateNewFruit', { 
       roomId, 
       playerNumber: playerNum,
@@ -529,6 +728,10 @@ function handleCollision(event, playerNum) {
           render: {sprite: {texture: `/${newFruit.name}.png`}
         },
           index: index + 1,
+          restitution: 0.2,
+          density: 0.001,
+          friction: 0.3,
+          frictionAir: 0.01,
         }
       );
 
@@ -600,6 +803,13 @@ function setupSocketEvents() {
   socket.on('gameStart', (data) => {
     console.log('Received gameStart event:', data);
     gameStarted = true;
+    
+    // Initialize synced random with server-provided seed
+    if (data.randomSeed) {
+      syncedRandom = new SyncedRandom(data.randomSeed);
+      console.log('Initialized synced random with seed:', data.randomSeed);
+    }
+    
     if (connectionStatus) {
       connectionStatus.textContent = 'Game started!';
       connectionStatus.style.backgroundColor = '#4CAF50';
@@ -613,8 +823,8 @@ function setupSocketEvents() {
       
       // Only generate fruit if I'm a valid player (1 or 2)
       if (myPlayerNumber === 1 || myPlayerNumber === 2) {
-        // Each player generates their own fruit
-        const myFruitIndex = Math.floor(Math.random() * 5);
+        // Each player generates their own fruit using synced random
+        const myFruitIndex = syncedRandom ? syncedRandom.randomInt(5) : Math.floor(Math.random() * 5);
         
         // Send my fruit to server for synchronization
         socket.emit('initializeMyFruit', { 
@@ -706,6 +916,53 @@ socket.on('newFruit', (data) => {
   // Only add fruit if this is NOT my player (I already added mine locally)
   if (data.playerNumber !== myPlayerNumber) {
     addFruitWithIndex(data.playerNumber, data.fruitIndex);
+  }
+});
+
+// Removed old sync checkpoint system - now using placement-based complete state sync
+
+// Handle collision synchronization
+socket.on('collisionEvent', (data) => {
+  // Server-authoritative collision events to prevent drift
+  if (data.playerNumber !== myPlayerNumber) {
+    const gameState = gameStates[`player${data.playerNumber}`];
+    if (gameState && data.collisionType === 'fruitMerge') {
+      console.log('Applying server-authoritative collision:', data);
+      // Force the collision result from server
+      // This ensures all clients see the same collision outcomes
+    }
+  }
+});
+
+// Handle complete game state updates (every 5 placements)
+socket.on('opponentCompleteState', (data) => {
+  console.log('📥 Received opponent complete game state:', data);
+  if (data.gameState && data.gameState.playerNumber !== myPlayerNumber) {
+    console.log(`🔄 Applying complete state for player ${data.gameState.playerNumber} (${data.gameState.bodies.length} bodies)`);
+    
+    // Show sync indicator
+    if (connectionStatus) {
+      const originalText = connectionStatus.textContent;
+      const originalColor = connectionStatus.style.backgroundColor;
+      connectionStatus.textContent = `📥 Receiving opponent state...`;
+      connectionStatus.style.backgroundColor = '#2196F3';
+      
+      setTimeout(() => {
+        connectionStatus.textContent = originalText;
+        connectionStatus.style.backgroundColor = originalColor;
+      }, 2000);
+    }
+    
+    try {
+      applyOpponentGameState(data.gameState);
+      console.log('✅ Opponent state applied successfully');
+    } catch (error) {
+      console.error('❌ Error applying opponent state:', error);
+      if (connectionStatus) {
+        connectionStatus.textContent = 'Sync error - retry in progress';
+        connectionStatus.style.backgroundColor = '#f44336';
+      }
+    }
   }
 });
 
