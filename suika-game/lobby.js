@@ -89,7 +89,6 @@ function updateConnectionStatus(text, status) {
 function updatePlayerProfile() {
   const nickname = nicknameInput.value.trim();
   if (nickname.length < 2) {
-    alert('Nickname must be at least 2 characters long');
     return;
   }
   
@@ -101,8 +100,6 @@ function updatePlayerProfile() {
     nickname: nickname,
     isReady: currentPlayer.isReady
   });
-  
-  alert('Profile updated successfully!');
 }
 
 // Create room
@@ -111,12 +108,10 @@ function createRoom() {
   const maxPlayers = parseInt(maxPlayersSelect.value);
   
   if (roomName.length < 3) {
-    alert('Room name must be at least 3 characters long');
     return;
   }
   
   if (!currentPlayer.nickname) {
-    alert('Please set your nickname first');
     return;
   }
   
@@ -132,12 +127,10 @@ function joinRoom() {
   const roomCode = roomCodeInput.value.trim();
   
   if (roomCode.length < 3) {
-    alert('Please enter a valid room code');
     return;
   }
   
   if (!currentPlayer.nickname) {
-    alert('Please set your nickname first');
     return;
   }
   
@@ -304,8 +297,6 @@ function setupSocketEvents() {
     
     updateRoomDisplay();
     updatePlayersList(data.players);
-    
-    alert(`Room created successfully! Room code: ${data.roomCode}`);
   });
   
   socket.on('roomJoined', (data) => {
@@ -323,8 +314,6 @@ function setupSocketEvents() {
     
     updateRoomDisplay();
     updatePlayersList(data.players);
-    
-    alert(`Joined room: ${data.roomName}`);
   });
   
   socket.on('roomLeft', () => {
@@ -382,7 +371,7 @@ function setupSocketEvents() {
   });
   
   socket.on('error', (data) => {
-    alert(`Error: ${data.message}`);
+    console.error(`Error: ${data.message}`);
   });
 }
 

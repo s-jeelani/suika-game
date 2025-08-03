@@ -49,7 +49,7 @@ function initializeDOMElements() {
   console.log('Game DOM elements initialized');
 }
 
-
+  
 
 // Initialize physics engine for a player
 function initializePlayerEngine(playerNum, canvasWidth = 800, canvasHeight = 600) {
@@ -119,7 +119,7 @@ function createPlayerRender(playerNum, canvas) {
     engine: engines[playerNum],
     canvas: canvas,
     options: {
-      wireframes: false,         // Back to normal mode now that we confirmed rendering works
+      wireframes: true,          // Enable wireframes to debug viewport issues
       background: "#F7f4C8",
       width: canvas.width,
       height: canvas.height,
@@ -155,17 +155,15 @@ function addFruitToPlayer(playerNum, fruitIndex) {
   
   console.log(`Adding fruit ${fruit.name} to player ${playerNum} at position ${centerX}, 50`);
   
-  // Try sprite rendering - rendering works so now test sprite paths
+  // Create fruit with bright colors for wireframe debugging
+  const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
   const body = Bodies.circle(centerX, 50, fruit.radius, {
     index: fruitIndex,
     isSleeping: true,
     render: {
-      sprite: { 
-        texture: `/${fruit.name}.png`,  // Try the root path first
-        xScale: 1,
-        yScale: 1
-      },
-      fillStyle: '#e74c3c'    // Fallback color if sprite fails
+      fillStyle: colors[fruitIndex % colors.length],    // Different color per fruit type
+      strokeStyle: '#2c3e50',
+      lineWidth: 2
     },
     restitution: 0.2,
     density: 0.001,
@@ -341,8 +339,15 @@ function createMiniViewer(playerNum, playerData) {
   initializePlayerEngine(playerNum, 800, 600);
   createPlayerRender(playerNum, canvas);
   
+  // Store original mini canvas for each player
+  if (!window.originalMiniCanvases) {
+    window.originalMiniCanvases = {};
+  }
+  window.originalMiniCanvases[playerNum] = canvas;
+  
   // Add click handler to switch view
   viewerDiv.addEventListener('click', () => {
+    console.log(`Clicked on player ${playerNum} mini viewer`);
     switchToPlayerView(playerNum);
   });
   
@@ -372,35 +377,45 @@ function updateMiniViewer(playerNum) {
   }
 }
 
+
+
 // Switch to player view
 function switchToPlayerView(playerNum) {
   if (gameState.currentView === playerNum) return;
   
+  console.log(`Switching from player ${gameState.currentView} to player ${playerNum}`);
+  
+  // Stop ALL current renders to avoid conflicts
+  Object.keys(renders).forEach(pNum => {
+    const render = renders[pNum];
+    if (render && render.canvas === mainCanvas) {
+      console.log(`Stopping main canvas render for player ${pNum}`);
+      Render.stop(render);
+      render.canvas = null;
+    }
+  });
+  
   gameState.currentView = playerNum;
   
   // Update main canvas to show this player's game
-  const targetCanvas = document.getElementById(`canvas-${playerNum}`);
-  if (targetCanvas) {
-    // Always use the main canvas size for consistent display
-    mainCanvas.width = 800;
-    mainCanvas.height = 600;
+  mainCanvas.width = 800;
+  mainCanvas.height = 600;
+  
+  // Use the original render but redirect it to main canvas
+  const originalRender = renders[playerNum];
+  if (originalRender) {
+    // Stop the original render first
+    Render.stop(originalRender);
     
-    // Instead of recreating, just redirect the existing render to main canvas
-    const render = renders[playerNum];
-    if (render) {
-      // Stop rendering on the mini canvas
-      Render.stop(render);
-      
-      // Update render to use main canvas
-      render.canvas = mainCanvas;
-      render.options.width = mainCanvas.width;
-      render.options.height = mainCanvas.height;
-      
-      // Restart rendering on main canvas
-      Render.run(render);
-      
-      console.log(`Redirected render for player ${playerNum} to main canvas ${mainCanvas.width}x${mainCanvas.height}`);
-    }
+    // Redirect to main canvas
+    originalRender.canvas = mainCanvas;
+    originalRender.options.width = mainCanvas.width;
+    originalRender.options.height = mainCanvas.height;
+    
+    // Restart on main canvas
+    Render.run(originalRender);
+    
+    console.log(`Redirected player ${playerNum} render to main canvas`);
   }
   
   // Update UI
@@ -428,8 +443,19 @@ function switchToPlayerView(playerNum) {
   const isViewingOwnGame = playerNum === gameState.playerNumber;
   mainCanvas.style.cursor = isViewingOwnGame ? 'crosshair' : 'default';
   
-  // Debug: Log canvas state
+  // Debug: Log canvas state and render info
   console.log(`Switched to player ${playerNum} view. Canvas size: ${mainCanvas.width}x${mainCanvas.height}`);
+  console.log(`Canvas client size: ${mainCanvas.clientWidth}x${mainCanvas.clientHeight}`);
+  console.log(`Canvas style: width=${mainCanvas.style.width}, height=${mainCanvas.style.height}`);
+  
+  // Ensure canvas is properly sized
+  setTimeout(() => {
+    const render = renders[playerNum];
+    if (render) {
+      console.log(`Render bounds: width=${render.bounds.max.x - render.bounds.min.x}, height=${render.bounds.max.y - render.bounds.min.y}`);
+      console.log(`Render options: width=${render.options.width}, height=${render.options.height}`);
+    }
+  }, 100);
 }
 
 // Update main game controls
@@ -592,18 +618,18 @@ function handleMouseMove(event, playerNum) {
   const clampedX = Math.max(30 + gameState.currentFruit.radius, 
                            Math.min(worldX, gameState.canvasWidth - 30 - gameState.currentFruit.radius));
   
-  Body.setPosition(gameState.currentBody, {
+    Body.setPosition(gameState.currentBody, {
     x: clampedX,
-    y: gameState.currentBody.position.y
-  });
-  
-  // Send position update
-  socket.emit('fruitMove', {
-    roomId: gameState.roomId,
-    playerNumber: playerNum,
+      y: gameState.currentBody.position.y
+    });
+    
+    // Send position update
+    socket.emit('fruitMove', {
+      roomId: gameState.roomId,
+      playerNumber: playerNum,
     x: clampedX,
-    y: gameState.currentBody.position.y
-  });
+      y: gameState.currentBody.position.y
+    });
 }
 
 // Set up socket events
@@ -648,7 +674,7 @@ function setupSocketEvents() {
     
     // Create mini viewers for all players (including your own)
     data.players.forEach(player => {
-      createMiniViewer(player.number, player);
+        createMiniViewer(player.number, player);
     });
     
     // Set up collision detection
