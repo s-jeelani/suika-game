@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Object Visibility Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .info {
+            color: blue;
+        }
+        .warning {
+            color: orange;
+        }
+    </style>
+</head>
+<body>
+    <h1>👁️ Object Visibility Fix Test</h1>
+    
+    <div class="test-section">
+        <h2>✅ OBJECT VISIBILITY FIXES:</h2>
+        <ul>
+            <li class="success">✅ Changed render from wireframes to filled objects</li>
+            <li class="success">✅ Added proper render properties to all fruit objects</li>
+            <li class="success">✅ Enhanced switchToPlayerView to ensure objects are visible</li>
+            <li class="success">✅ Added complete state synchronization when switching views</li>
+            <li class="success">✅ Fixed collision-created fruits to have proper colors</li>
+            <li class="success">✅ Added server handlers for state synchronization</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔧 Technical Fixes Applied:</h2>
+        <ul>
+            <li class="info"><strong>Render Mode:</strong> Changed from wireframes: true to wireframes: false</li>
+            <li class="info"><strong>Color Properties:</strong> All fruits now have fillStyle and strokeStyle</li>
+            <li class="info"><strong>State Sync:</strong> Complete game state requested when switching to other players</li>
+            <li class="info"><strong>Forced Render:</strong> Manual render update after view switch</li>
+            <li class="info"><strong>Error Checking:</strong> Verify engine and gameState exist before switching</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>🧪 How to Test Object Visibility:</h2>
+        <ol>
+            <li><strong>Start the game:</strong> <a href="http://localhost:5173/game.html" target="_blank">Open Game</a></li>
+            <li><strong>Join a room with 2+ players</strong></li>
+            <li><strong>Test Your Own Game:</strong>
+                <ul>
+                    <li>Drop some fruits and make combinations</li>
+                    <li>✅ Should see colored circles/fruits falling</li>
+                    <li>✅ No empty screen</li>
+                </ul>
+            </li>
+            <li><strong>Test Other Player's Game:</strong>
+                <ul>
+                    <li>Have the other player drop fruits</li>
+                    <li>Click on their mini viewer to switch views</li>
+                    <li>✅ Should see their fruits immediately</li>
+                    <li>✅ Objects should be colored, not invisible</li>
+                </ul>
+            </li>
+            <li><strong>Test State Synchronization:</strong>
+                <ul>
+                    <li>Switch between different player views</li>
+                    <li>Check browser console for state sync messages</li>
+                    <li>✅ Should see "Requesting complete state for player X"</li>
+                    <li>✅ Should see "Player X world has Y bodies"</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔍 Debug Console Messages:</h2>
+        <p><strong>When switching views, you should see:</strong></p>
+        <ul>
+            <li class="info">"Switching from player X to player Y"</li>
+            <li class="info">"Player Y world has Z bodies"</li>
+            <li class="info">"Created simple render for player Y on main canvas"</li>
+            <li class="info">"Requesting complete state for player Y" (if viewing others)</li>
+        </ul>
+        
+        <p><strong>What you should NOT see:</strong></p>
+        <ul>
+            <li class="error">❌ "No engine or gameState found for player X"</li>
+            <li class="error">❌ Empty screen when switching views</li>
+            <li class="error">❌ Objects disappearing</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>🎨 Object Appearance:</h2>
+        <ul>
+            <li class="success">✅ Fruits should appear as colored circles</li>
+            <li class="success">✅ Different fruit types have different colors</li>
+            <li class="success">✅ Objects have black outlines (strokeStyle)</li>
+            <li class="success">✅ No wireframe lines, just solid colored shapes</li>
+            <li class="success">✅ Objects should be visible immediately upon view switch</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>⚠️ Troubleshooting:</h2>
+        <p><strong>If objects are still not visible:</strong></p>
+        <ol>
+            <li>Check browser console for errors</li>
+            <li>Verify the world has bodies: look for "Player X world has Y bodies"</li>
+            <li>Check if render is created: look for "Created simple render for player X"</li>
+            <li>Try refreshing the page and rejoining</li>
+            <li>Make sure both players have dropped fruits before switching views</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔄 State Synchronization:</h2>
+        <p>The new state sync system ensures that when you switch to view another player's game, their complete world state (all fruits and positions) is requested and applied to your view.</p>
+        <ul>
+            <li class="info">Request sent when switching to other player's view</li>
+            <li class="info">Target player sends their complete world state</li>
+            <li class="info">Requesting player receives and applies the state</li>
+            <li class="info">All existing fruits should become visible</li>
+        </ul>
+    </div>
+</body>
+</html> 

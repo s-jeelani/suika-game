@@ -265,6 +265,32 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle complete state requests
+  socket.on('requestCompleteState', ({ roomId, requestedPlayerNumber }) => {
+    console.log(`Player requesting complete state for player ${requestedPlayerNumber} in room ${roomId}`);
+    const room = gameRooms.get(roomId);
+    if (room) {
+      // Forward the request to the specific player
+      socket.to(roomId).emit('requestCompleteState', {
+        requestedPlayerNumber: requestedPlayerNumber,
+        roomId: roomId
+      });
+    }
+  });
+
+  // Handle sending complete state
+  socket.on('sendCompleteState', ({ roomId, gameState }) => {
+    console.log(`Player ${gameState.playerNumber} sending complete state in room ${roomId}`);
+    const room = gameRooms.get(roomId);
+    if (room) {
+      // Broadcast the complete state to all other players
+      socket.to(roomId).emit('opponentCompleteState', {
+        gameState: gameState,
+        roomId: roomId
+      });
+    }
+  });
+
   // Handle player profile updates
   socket.on('updateProfile', ({ nickname, isReady }) => {
     console.log('Player profile update:', { socketId: socket.id, nickname, isReady });

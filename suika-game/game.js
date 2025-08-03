@@ -394,13 +394,16 @@ function createSimpleRender(engine, canvas) {
     engine: engine,
     canvas: canvas,
     options: {
-      wireframes: true,
+      wireframes: false, // Change to false to show textures/colors
       background: "#F7f4C8",
       width: canvas.width,
       height: canvas.height,
       pixelRatio: 'auto',
       showDebug: false,
-      hasBounds: false
+      hasBounds: false,
+      enabled: true,
+      showVelocity: false,
+      showAngleIndicator: false
     }
   });
 }
@@ -426,10 +429,37 @@ function switchToPlayerView(playerNum) {
   mainCanvas.width = 400;
   mainCanvas.height = 600;
   
+  // Ensure the engine and world exist for this player
+  const targetEngine = engines[playerNum];
+  const targetGameState = gameStates[playerNum];
+  
+  if (!targetEngine || !targetGameState) {
+    console.error(`No engine or gameState found for player ${playerNum}`);
+    return;
+  }
+  
+  console.log(`Player ${playerNum} world has ${targetGameState.world.bodies.length} bodies`);
+  
   // Create one simple render for main canvas
-  const mainRender = createSimpleRender(engines[playerNum], mainCanvas);
+  const mainRender = createSimpleRender(targetEngine, mainCanvas);
   renders[playerNum] = mainRender;
   Render.run(mainRender);
+  
+  // Force a render update to show existing bodies
+  setTimeout(() => {
+    if (renders[playerNum]) {
+      Render.world(renders[playerNum]);
+      
+      // If viewing another player's game, request their complete state
+      if (playerNum !== gameState.playerNumber) {
+        console.log(`Requesting complete state for player ${playerNum}`);
+        socket.emit('requestCompleteState', {
+          roomId: gameState.roomId,
+          requestedPlayerNumber: playerNum
+        });
+      }
+    }
+  }, 100);
   
   console.log(`Created simple render for player ${playerNum} on main canvas`);
   
@@ -541,11 +571,17 @@ function handleCollision(event, playerNum) {
       World.remove(playerGameState.world, [collision.bodyA, collision.bodyB]);
 
       const newFruit = FRUITS[index + 1];
+      const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#8e44ad', '#16a085', '#d35400', '#c0392b'];
       const newBody = Bodies.circle(
         collision.collision.supports[0].x,
         collision.collision.supports[0].y,
         newFruit.radius, {
-          render: {sprite: {texture: `/${newFruit.name}.png`}},
+          render: {
+            fillStyle: colors[(index + 1) % colors.length],
+            strokeStyle: '#2c3e50',
+            lineWidth: 2,
+            sprite: {texture: `/${newFruit.name}.png`}
+          },
           index: index + 1,
           restitution: 0.2,
           density: 0.001,
@@ -868,6 +904,39 @@ function setupSocketEvents() {
   socket.on('opponentCompleteState', (data) => {
     if (data.gameState && data.gameState.playerNumber !== gameState.playerNumber) {
       applyOpponentGameState(data.gameState);
+    }
+  });
+  
+  socket.on('requestCompleteState', (data) => {
+    if (data.requestedPlayerNumber === gameState.playerNumber) {
+      // Send our complete game state to the requester
+      const currentState = gameStates[gameState.playerNumber];
+      if (currentState) {
+        const completeState = {
+          playerNumber: gameState.playerNumber,
+          score: currentState.score,
+          placementCount: currentState.placementCount,
+          num_suika: currentState.num_suika,
+          bodies: currentState.world.bodies
+            .filter(body => !body.isStatic && body.index !== undefined)
+            .map(body => ({
+              x: body.position.x,
+              y: body.position.y,
+              radius: Math.sqrt(body.area / Math.PI),
+              index: body.index,
+              velocityX: body.velocity.x,
+              velocityY: body.velocity.y,
+              angularVelocity: body.angularVelocity,
+              angle: body.angle,
+              isSleeping: body.isSleeping
+            }))
+        };
+        
+        socket.emit('sendCompleteState', {
+          roomId: gameState.roomId,
+          gameState: completeState
+        });
+      }
     }
   });
   
