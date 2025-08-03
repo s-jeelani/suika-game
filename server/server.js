@@ -297,321 +297,224 @@ io.on('connection', (socket) => {
     playerProfiles.set(socket.id, { nickname, isReady });
   });
 
-  // Handle room creation
-  socket.on('createRoom', ({ name, maxPlayers, hostNickname }) => {
-    console.log('Creating room:', { name, maxPlayers, hostNickname });
-    
-    const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const room = {
-      players: [socket.id],
-      scores: {},
-      gameState: 'waiting',
-      randomSeed: null,
-      playerStates: {},
-      healthChecks: {},
-      winner: null,
-      maxPlayers: maxPlayers || 4,
-      roomName: name,
-      hostId: socket.id,
-      createdAt: new Date().toISOString()
+// Create players list with proper numbering
+function createPlayersList(room) {
+  return room.players.map((playerId, index) => {
+    const profile = playerProfiles.get(playerId);
+    const isHost = playerId === room.hostId;
+    // If host, assign number 2, otherwise start from 3
+    const playerNumber = isHost ? 2 : index + 3;
+    return {
+      id: playerId,
+      number: playerNumber,
+      nickname: profile?.nickname || `Player ${playerNumber}`,
+      isHost: isHost,
+      isReady: profile?.isReady || false
     };
-    
-    gameRooms.set(roomId, room);
-    playerScores.set(socket.id, 0);
-    playerProfiles.set(socket.id, { nickname: hostNickname, isReady: true });
-    console.log(`DEBUG: Host "${hostNickname}" created room ${roomId}`);
-    
-    socket.join(roomId);
-    
-    const players = [{
-      id: socket.id,
-      number: 2, // Start with player 2 for host
-      nickname: hostNickname,
-      isHost: true,
-      isReady: true
-    }];
-    
-    socket.emit('roomCreated', {
-      roomId,
-      roomName: name,
-      roomCode: roomId,
-      maxPlayers,
-      players
-    });
-    
-    console.log(`Room created: ${roomId} by ${hostNickname}`);
-    console.log('Total rooms after creation:', gameRooms.size);
-    console.log('Available rooms:', Array.from(gameRooms.keys()));
   });
+}
 
-  // Handle room joining
-  socket.on('joinRoom', ({ roomCode, nickname }) => {
-    console.log('Player attempting to join room:', roomCode, 'with nickname:', nickname);
+// Handle room creation
+socket.on('createRoom', ({ name, maxPlayers, hostNickname }) => {
+  console.log('Creating room:', { name, maxPlayers, hostNickname });
+  
+  const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const room = {
+    players: [socket.id],
+    scores: {},
+    gameState: 'waiting',
+    randomSeed: null,
+    playerStates: {},
+    healthChecks: {},
+    winner: null,
+    maxPlayers: maxPlayers || 4,
+    roomName: name,
+    hostId: socket.id,
+    createdAt: new Date().toISOString()
+  };
+  
+  gameRooms.set(roomId, room);
+  playerScores.set(socket.id, 0);
+  playerProfiles.set(socket.id, { nickname: hostNickname, isReady: true });
+  console.log(`DEBUG: Host "${hostNickname}" created room ${roomId}`);
+  
+  socket.join(roomId);
+  
+  const players = createPlayersList(room);
+  
+  socket.emit('roomCreated', {
+    roomId,
+    roomName: name,
+    roomCode: roomId,
+    maxPlayers,
+    players
+  });
+  
+  console.log(`Room created: ${roomId} by ${hostNickname}`);
+  console.log('Total rooms after creation:', gameRooms.size);
+  console.log('Available rooms:', Array.from(gameRooms.keys()));
+});
+
+// Handle room joining
+socket.on('joinRoom', ({ roomCode, nickname }) => {
+  console.log('Player attempting to join room:', roomCode, 'with nickname:', nickname);
+  
+  if (!gameRooms.has(roomCode)) {
+    socket.emit('error', { message: 'Room not found' });
+    return;
+  }
+  
+  const room = gameRooms.get(roomCode);
+  
+  if (room.gameState === 'playing') {
+    socket.emit('error', { message: 'Game already in progress' });
+    return;
+  }
+  
+  if (room.players.length >= room.maxPlayers) {
+    socket.emit('error', { message: 'Room is full' });
+    return;
+  }
+  
+  // Check if player is already in the room
+  if (room.players.includes(socket.id)) {
+    const players = createPlayersList(room);
+    const playerNumber = players.find(p => p.id === socket.id)?.number;
+    console.log('Player already in room as player', playerNumber);
     
-    if (!gameRooms.has(roomCode)) {
-      socket.emit('error', { message: 'Room not found' });
-      return;
-    }
-    
-    const room = gameRooms.get(roomCode);
-    
-    if (room.gameState === 'playing') {
-      socket.emit('error', { message: 'Game already in progress' });
-      return;
-    }
-    
-    if (room.players.length >= room.maxPlayers) {
-      socket.emit('error', { message: 'Room is full' });
-      return;
-    }
-    
-    // Check if player is already in the room
-    if (room.players.includes(socket.id)) {
-      const existingPlayerNumber = room.players.indexOf(socket.id) + 2; // Add 2 instead of 1
-      console.log('Player already in room as player', existingPlayerNumber);
-      
-      const players = room.players.map((playerId, index) => ({
-        id: playerId,
-        number: index + 2, // Add 2 instead of 1
-        nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 2}`,
-        isHost: playerId === room.hostId,
-        isReady: playerProfiles.get(playerId)?.isReady || false
-      }));
-      
-      socket.emit('roomJoined', {
-        roomId: roomCode,
-        roomName: room.roomName,
-        maxPlayers: room.maxPlayers,
-        players
-      });
-      return;
-    }
-    
-    // Add player to room
-    room.players.push(socket.id);
-    playerScores.set(socket.id, 0);
-    
-    // Check if nickname is already taken in this room
-    const existingNicknames = room.players.map(id => playerProfiles.get(id)?.nickname).filter(Boolean);
-    let uniqueNickname = nickname;
-    let counter = 1;
-    while (existingNicknames.includes(uniqueNickname)) {
-      uniqueNickname = `${nickname}${counter}`;
-      counter++;
-    }
-    
-    playerProfiles.set(socket.id, { nickname: uniqueNickname, isReady: true });
-    
-    const playerNumber = room.players.length + 1; // This will start from 3 since host is 2
-    console.log(`Player ${uniqueNickname} joined as player ${playerNumber}. Room now has ${room.players.length} players.`);
-    
-    // Create players list
-    const players = room.players.map((playerId, index) => {
-      const profile = playerProfiles.get(playerId);
-      return {
-        id: playerId,
-        number: index + 2, // Add 2 instead of 1
-        nickname: profile?.nickname || `Player ${index + 2}`,
-        isHost: playerId === room.hostId,
-        isReady: profile?.isReady || false
-      };
-    });
-    
-    socket.join(roomCode);
-    
-    // Send joinedRoom to the new player
     socket.emit('roomJoined', {
       roomId: roomCode,
       roomName: room.roomName,
       maxPlayers: room.maxPlayers,
       players
     });
-    
-    // Notify other players
-    socket.to(roomCode).emit('playerJoined', {
-      playerNumber,
-      players
-    });
-    
-    console.log(`Room ${roomCode} now has ${room.players.length} players:`, players.map(p => p.nickname));
+    return;
+  }
+  
+  // Add player to room
+  room.players.push(socket.id);
+  playerScores.set(socket.id, 0);
+  
+  // Check if nickname is already taken in this room
+  const existingNicknames = room.players.map(id => playerProfiles.get(id)?.nickname).filter(Boolean);
+  let uniqueNickname = nickname;
+  let counter = 1;
+  while (existingNicknames.includes(uniqueNickname)) {
+    uniqueNickname = `${nickname}${counter}`;
+    counter++;
+  }
+  
+  playerProfiles.set(socket.id, { nickname: uniqueNickname, isReady: true });
+  
+  const players = createPlayersList(room);
+  const playerNumber = players.find(p => p.id === socket.id)?.number;
+  console.log(`Player ${uniqueNickname} joined as player ${playerNumber}. Room now has ${room.players.length} players.`);
+  
+  socket.join(roomCode);
+  
+  // Send joinedRoom to the new player
+  socket.emit('roomJoined', {
+    roomId: roomCode,
+    roomName: room.roomName,
+    maxPlayers: room.maxPlayers,
+    players
   });
-
-  // Handle leaving room
-  socket.on('leaveRoom', ({ roomId }) => {
-    console.log('Player leaving room:', roomId);
-    
-    const room = gameRooms.get(roomId);
-    if (!room) return;
-    
-    const playerIndex = room.players.indexOf(socket.id);
-    if (playerIndex === -1) return;
-    
-    room.players.splice(playerIndex, 1);
-    socket.leave(roomId);
-    
-    // Notify other players
-    socket.to(roomId).emit('playerLeft', {
-      playerNumber: playerIndex + 2, // Adjust player number for leaving
-      players: room.players.map((playerId, index) => ({
-        id: playerId,
-        number: index + 2, // Adjust player number for leaving
-        nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 2}`,
-        isHost: playerId === room.hostId,
-        isReady: playerProfiles.get(playerId)?.isReady || false
-      }))
-    });
-    
-    // If room is empty, delete it
-    if (room.players.length === 0) {
-      gameRooms.delete(roomId);
-      console.log(`Room ${roomId} deleted (empty)`);
-    } else {
-      // If host left, assign new host
-      if (room.hostId === socket.id) {
-        room.hostId = room.players[0];
-        socket.to(roomId).emit('newHost', { hostId: room.hostId });
-      }
-    }
-    
-    socket.emit('roomLeft');
+  
+  // Notify other players
+  socket.to(roomCode).emit('playerJoined', {
+    playerNumber,
+    players
   });
+  
+  console.log(`Room ${roomCode} now has ${room.players.length} players:`, players.map(p => p.nickname));
+});
 
-  // Handle game start
-  socket.on('startGame', ({ roomId }) => {
-    console.log('Starting game for room:', roomId);
-    console.log('Available rooms:', Array.from(gameRooms.keys()));
-    
-    const room = gameRooms.get(roomId);
-    if (!room) {
-      console.log(`Room ${roomId} not found when starting game`);
-      socket.emit('error', { message: 'Room not found' });
-      return;
+// Handle joining game room (from lobby)
+socket.on('joinGameRoom', ({ roomId, nickname, playerId, playerNumber }) => {
+  console.log('Player joining game room:', roomId, nickname, playerId, 'requested player number:', playerNumber);
+  console.log('Available rooms:', Array.from(gameRooms.keys()));
+  
+  const room = gameRooms.get(roomId);
+  if (!room) {
+    console.log(`Room ${roomId} not found. Available rooms:`, Array.from(gameRooms.keys()));
+    socket.emit('error', { message: 'Game room not found' });
+    return;
+  }
+  
+  // Try to find player by socket ID, then by playerId, then by playerNumber, then by nickname
+  let playerIndex = room.players.indexOf(socket.id);
+  
+  // If not found by socket ID, try playerId
+  if (playerIndex === -1 && playerId) {
+    playerIndex = room.players.indexOf(playerId);
+    if (playerIndex !== -1) {
+      // Update the player's socket ID to the new connection
+      room.players[playerIndex] = socket.id;
+      const oldProfile = playerProfiles.get(playerId);
+      if (oldProfile) playerProfiles.set(socket.id, oldProfile);
+      playerProfiles.delete(playerId);
+      console.log(`DEBUG: Matched player by playerId. Updated player slot ${playerIndex} to socket ${socket.id}`);
     }
-    
-    if (room.hostId !== socket.id) {
-      console.log(`Player ${socket.id} tried to start game but host is ${room.hostId}`);
-      socket.emit('error', { message: 'Only host can start the game' });
-      return;
-    }
-    
-    room.gameState = 'playing';
-    room.randomSeed = Math.floor(Math.random() * 1000000);
-    
-    const players = room.players.map((playerId, index) => ({
-      id: playerId,
-      number: index + 2, // Adjust player number for starting game
-      nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 2}`,
-      isHost: playerId === room.hostId,
-      isReady: true
-    }));
-    
-    console.log(`Emitting gameStarting to room ${roomId} with ${players.length} players`);
-    io.to(roomId).emit('gameStarting', {
-      roomId,
-      players,
-      randomSeed: room.randomSeed
-    });
-  });
-
-  // Handle joining game room (from lobby)
-  socket.on('joinGameRoom', ({ roomId, nickname, playerId, playerNumber }) => {
-    console.log('Player joining game room:', roomId, nickname, playerId, 'requested player number:', playerNumber);
-    console.log('Available rooms:', Array.from(gameRooms.keys()));
-    
-    const room = gameRooms.get(roomId);
-    if (!room) {
-      console.log(`Room ${roomId} not found. Available rooms:`, Array.from(gameRooms.keys()));
-      socket.emit('error', { message: 'Game room not found' });
-      return;
-    }
-    
-    // Try to find player by socket ID, then by playerId, then by playerNumber, then by nickname
-    let playerIndex = room.players.indexOf(socket.id);
-    
-    // If not found by socket ID, try playerId
-    if (playerIndex === -1 && playerId) {
-      playerIndex = room.players.indexOf(playerId);
-      if (playerIndex !== -1) {
-        // Update the player's socket ID to the new connection
+  }
+  
+  // If still not found and playerNumber provided, try to match by player number
+  if (playerIndex === -1 && playerNumber) {
+    // playerNumber is 2-based (starts from 2), convert to 0-based index
+    const requestedIndex = playerNumber === 2 ? 0 : playerNumber - 3;
+    if (requestedIndex >= 0 && requestedIndex < room.players.length) {
+      // Verify this slot isn't actively being used
+      const existingSocketId = room.players[requestedIndex];
+      const isSlotAbandoned = !io.sockets.sockets.get(existingSocketId);
+      if (isSlotAbandoned) {
+        playerIndex = requestedIndex;
         room.players[playerIndex] = socket.id;
-        const oldProfile = playerProfiles.get(playerId);
+        console.log(`DEBUG: Matched player to requested slot ${playerIndex} (player ${playerNumber})`);
+      }
+    }
+  }
+  
+  // If still not found, try nickname as last resort
+  if (playerIndex === -1 && nickname) {
+    const playerProfilesArray = Array.from(playerProfiles.entries());
+    const playerEntry = playerProfilesArray.find(([id, profile]) => profile.nickname === nickname);
+    if (playerEntry) {
+      const oldSocketId = playerEntry[0];
+      playerIndex = room.players.indexOf(oldSocketId);
+      if (playerIndex !== -1) {
+        room.players[playerIndex] = socket.id;
+        const oldProfile = playerProfiles.get(oldSocketId);
         if (oldProfile) playerProfiles.set(socket.id, oldProfile);
-        playerProfiles.delete(playerId);
-        console.log(`DEBUG: Matched player by playerId. Updated player slot ${playerIndex} to socket ${socket.id}`);
+        playerProfiles.delete(oldSocketId);
+        console.log(`DEBUG: Matched player by nickname. Updated player slot ${playerIndex} to socket ${socket.id}`);
       }
     }
-    
-    // If still not found and playerNumber provided, try to match by player number
-    if (playerIndex === -1 && playerNumber) {
-      // playerNumber is 1-based, convert to 0-based index
-      const requestedIndex = playerNumber - 1;
-      if (requestedIndex >= 0 && requestedIndex < room.players.length) {
-        // Verify this slot isn't actively being used
-        const existingSocketId = room.players[requestedIndex];
-        const isSlotAbandoned = !io.sockets.sockets.get(existingSocketId);
-        if (isSlotAbandoned) {
-          playerIndex = requestedIndex;
-          room.players[playerIndex] = socket.id;
-          console.log(`DEBUG: Matched player to requested slot ${playerIndex} (player ${playerNumber})`);
-        }
-      }
-    }
-    
-    // If still not found, try nickname as last resort
-    if (playerIndex === -1 && nickname) {
-      const playerProfilesArray = Array.from(playerProfiles.entries());
-      const playerEntry = playerProfilesArray.find(([id, profile]) => profile.nickname === nickname);
-      if (playerEntry) {
-        const oldSocketId = playerEntry[0];
-        playerIndex = room.players.indexOf(oldSocketId);
-        if (playerIndex !== -1) {
-          room.players[playerIndex] = socket.id;
-          const oldProfile = playerProfiles.get(oldSocketId);
-          if (oldProfile) playerProfiles.set(socket.id, oldProfile);
-          playerProfiles.delete(oldSocketId);
-          console.log(`DEBUG: Matched player by nickname. Updated player slot ${playerIndex} to socket ${socket.id}`);
-        }
-      }
-    }
-    
-    // Only add as a new player if not found by any means
-    if (playerIndex === -1) {
-      console.log(`DEBUG: Player not found by any means. Adding as new player.`);
-      room.players.push(socket.id);
-      playerScores.set(socket.id, 0);
-      playerProfiles.set(socket.id, { nickname, isReady: true });
-      playerIndex = room.players.length - 1;
-    }
-    
-    // Always use the player's actual index for their number
-    let assignedPlayerNumber = playerIndex + 2; // Adjust for new numbering
-    
-    console.log(`DEBUG: Player ${socket.id} (${nickname}) assigned player number ${assignedPlayerNumber} (index in array: ${playerIndex})`);
-    console.log(`DEBUG: Room players:`, room.players);
-    console.log(`DEBUG: All player profiles:`, Array.from(playerProfiles.entries()));
-    
-    const players = room.players.map((playerId, index) => {
-      const profile = playerProfiles.get(playerId);
-      return {
-        id: playerId,
-        number: index + 2, // Adjust for new numbering
-        nickname: profile?.nickname || `Player ${index + 2}`,
-        isHost: playerId === room.hostId,
-        isReady: true
-      };
-    });
-    
-    console.log(`DEBUG: Final players list:`, players);
-    console.log(`DEBUG: Sending gameJoined to player ${socket.id} with player number ${assignedPlayerNumber}`);
-    
-    socket.emit('gameJoined', {
-      roomId,
-      playerNumber: assignedPlayerNumber,
-      players,
-      maxPlayers: room.maxPlayers,
-      randomSeed: room.randomSeed
-    });
+  }
+  
+  // Only add as a new player if not found by any means
+  if (playerIndex === -1) {
+    console.log(`DEBUG: Player not found by any means. Adding as new player.`);
+    room.players.push(socket.id);
+    playerScores.set(socket.id, 0);
+    playerProfiles.set(socket.id, { nickname, isReady: true });
+    playerIndex = room.players.length - 1;
+  }
+  
+  const players = createPlayersList(room);
+  const assignedPlayerNumber = players.find(p => p.id === socket.id)?.number;
+  
+  console.log(`DEBUG: Player ${socket.id} (${nickname}) assigned player number ${assignedPlayerNumber} (index in array: ${playerIndex})`);
+  console.log(`DEBUG: Room players:`, room.players);
+  console.log(`DEBUG: All player profiles:`, Array.from(playerProfiles.entries()));
+  console.log(`DEBUG: Final players list:`, players);
+  
+  socket.emit('gameJoined', {
+    roomId,
+    playerNumber: assignedPlayerNumber,
+    players,
+    maxPlayers: room.maxPlayers,
+    randomSeed: room.randomSeed
   });
+});
 
   // Handle getting available rooms
   socket.on('getRooms', () => {
