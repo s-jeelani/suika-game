@@ -227,6 +227,14 @@ window.joinRoomByCode = function(code) {
   joinRoom();
 };
 
+// Utility to generate a UUID if needed
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // Set up event listeners
 function setupEventListeners() {
   // Room management
@@ -309,6 +317,9 @@ function setupSocketEvents() {
     
     updateRoomDisplay();
     updatePlayersList(data.players);
+    // Store playerId in localStorage
+    const playerId = socket.id || generateUUID();
+    localStorage.setItem('suika-player-id', playerId);
   });
   
   socket.on('roomJoined', (data) => {
@@ -326,6 +337,9 @@ function setupSocketEvents() {
     
     updateRoomDisplay();
     updatePlayersList(data.players);
+    // Store playerId in localStorage
+    const playerId = socket.id || generateUUID();
+    localStorage.setItem('suika-player-id', playerId);
   });
   
   socket.on('roomLeft', () => {

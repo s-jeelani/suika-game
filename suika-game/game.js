@@ -811,15 +811,15 @@ function setupSocketEvents() {
     // Load room info
     const roomId = localStorage.getItem('suika-room-id');
     const nickname = localStorage.getItem('suika-player-nickname');
+    const playerId = localStorage.getItem('suika-player-id');
     
-    console.log('Retrieved from localStorage - roomId:', roomId, 'nickname:', nickname);
+    console.log('Retrieved from localStorage - roomId:', roomId, 'nickname:', nickname, 'playerId:', playerId);
     
     if (roomId && nickname) {
       gameState.roomId = roomId;
       gameState.playerNickname = nickname;
-      
-      // Join game room
-      socket.emit('joinGameRoom', { roomId, nickname });
+      // Join game room with playerId
+      socket.emit('joinGameRoom', { roomId, nickname, playerId });
     } else {
       alert('No room information found. Please return to lobby.');
       window.location.href = '/lobby.html';
