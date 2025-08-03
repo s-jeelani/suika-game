@@ -9,29 +9,9 @@
 </head>
 <body>
     <div id="game-container">
-        <!-- Game Header -->
-        <header id="game-header">
-            <div class="header-left">
-                <h1>🍉 Suika Game</h1>
-                <div class="room-info">
-                    <span id="room-name">Room: Loading...</span>
-                    <span id="room-code">Code: ...</span>
-                </div>
-            </div>
-            <div class="header-center">
-                <div id="connection-status" class="status-indicator">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Connecting...</span>
-                </div>
-            </div>
-            <div class="header-right">
-                <button id="back-to-lobby" class="secondary">← Back to Lobby</button>
-            </div>
-        </header>
-
         <!-- Main Game Area -->
         <div id="game-layout">
-            <!-- Main Game Canvas (Your Game) -->
+            <!-- Main Game Canvas -->
             <div id="main-game-area">
                 <div class="game-header">
                     <h2 id="main-player-name">Your Game</h2>
@@ -47,22 +27,20 @@
                 </div>
             </div>
 
-            <!-- Mini Viewers (Other Players) -->
+            <!-- Mini Viewers -->
             <div id="mini-viewers">
-                <h3>Other Players</h3>
+                <h3>All Players</h3>
                 <div id="viewers-container">
                     <!-- Mini viewers will be dynamically added here -->
                 </div>
             </div>
-        </div>
 
-        <!-- Game Status -->
-        <div id="game-status">
-            <div id="current-viewer" class="viewer-indicator">
-                <span>👁️ Currently viewing: <strong>Your Game</strong></span>
-            </div>
-            <div id="game-message" class="game-message">
-                <span>Waiting for game to start...</span>
+            <!-- Currently Viewing Label -->
+            <div id="viewing-label">
+                <div class="viewing-indicator">
+                    <span>👁️ Currently viewing:</span>
+                    <strong id="current-viewer-name">Your Game</strong>
+                </div>
             </div>
         </div>
 
