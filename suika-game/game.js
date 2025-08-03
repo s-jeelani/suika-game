@@ -812,14 +812,15 @@ function setupSocketEvents() {
     const roomId = localStorage.getItem('suika-room-id');
     const nickname = localStorage.getItem('suika-player-nickname');
     const playerId = localStorage.getItem('suika-player-id');
+    const storedPlayerNumber = parseInt(localStorage.getItem('suika-player-number'));
     
-    console.log('Retrieved from localStorage - roomId:', roomId, 'nickname:', nickname, 'playerId:', playerId);
+    console.log('Retrieved from localStorage - roomId:', roomId, 'nickname:', nickname, 'playerId:', playerId, 'playerNumber:', storedPlayerNumber);
     
     if (roomId && nickname) {
       gameState.roomId = roomId;
       gameState.playerNickname = nickname;
-      // Join game room with playerId
-      socket.emit('joinGameRoom', { roomId, nickname, playerId });
+      // Join game room with all stored info
+      socket.emit('joinGameRoom', { roomId, nickname, playerId, playerNumber: storedPlayerNumber });
     } else {
       alert('No room information found. Please return to lobby.');
       window.location.href = '/lobby.html';
@@ -877,6 +878,7 @@ function setupSocketEvents() {
     gameState.gameStarted = true;
     
     // Set initial view to your own game and add initial fruit
+    // IMPORTANT: Always start with your own view based on your player number
     switchToPlayerView(gameState.playerNumber);
     addFruitToPlayer(gameState.playerNumber, Math.floor(Math.random() * 5));
   });

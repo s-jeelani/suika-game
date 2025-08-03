@@ -392,6 +392,13 @@ function setupSocketEvents() {
     localStorage.setItem('suika-room-id', currentRoom.id);
     localStorage.setItem('suika-player-nickname', currentPlayer.nickname);
     
+    // NEW: store my playerNumber for robust reconnect
+    const me = data.players.find(p => p.id === socket.id);
+    if (me) {
+      localStorage.setItem('suika-player-number', String(me.number));
+      console.log('Saved my playerNumber to localStorage:', me.number);
+    }
+    
     // Navigate to game immediately (all players including host)
     window.location.href = '/game.html';
   });

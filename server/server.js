@@ -522,8 +522,8 @@ io.on('connection', (socket) => {
   });
 
   // Handle joining game room (from lobby)
-  socket.on('joinGameRoom', ({ roomId, nickname, playerId }) => {
-    console.log('Player joining game room:', roomId, nickname, playerId);
+  socket.on('joinGameRoom', ({ roomId, nickname, playerId, playerNumber }) => {
+    console.log('Player joining game room:', roomId, nickname, playerId, 'requested player number:', playerNumber);
     console.log('Available rooms:', Array.from(gameRooms.keys()));
     
     const room = gameRooms.get(roomId);
@@ -533,8 +533,10 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Try to find player by socket ID, then by playerId, then by nickname
+    // Try to find player by socket ID, then by playerId, then by playerNumber, then by nickname
     let playerIndex = room.players.indexOf(socket.id);
+    
+    // If not found by socket ID, try playerId
     if (playerIndex === -1 && playerId) {
       playerIndex = room.players.indexOf(playerId);
       if (playerIndex !== -1) {
@@ -546,8 +548,25 @@ io.on('connection', (socket) => {
         console.log(`DEBUG: Matched player by playerId. Updated player slot ${playerIndex} to socket ${socket.id}`);
       }
     }
+    
+    // If still not found and playerNumber provided, try to match by player number
+    if (playerIndex === -1 && playerNumber) {
+      // playerNumber is 1-based, convert to 0-based index
+      const requestedIndex = playerNumber - 1;
+      if (requestedIndex >= 0 && requestedIndex < room.players.length) {
+        // Verify this slot isn't actively being used
+        const existingSocketId = room.players[requestedIndex];
+        const isSlotAbandoned = !io.sockets.sockets.get(existingSocketId);
+        if (isSlotAbandoned) {
+          playerIndex = requestedIndex;
+          room.players[playerIndex] = socket.id;
+          console.log(`DEBUG: Matched player to requested slot ${playerIndex} (player ${playerNumber})`);
+        }
+      }
+    }
+    
+    // If still not found, try nickname as last resort
     if (playerIndex === -1 && nickname) {
-      // Try to find by nickname (legacy fallback)
       const playerProfilesArray = Array.from(playerProfiles.entries());
       const playerEntry = playerProfilesArray.find(([id, profile]) => profile.nickname === nickname);
       if (playerEntry) {
@@ -562,19 +581,21 @@ io.on('connection', (socket) => {
         }
       }
     }
+    
     // Only add as a new player if not found by any means
     if (playerIndex === -1) {
-      console.log(`DEBUG: Player not found by socket ID, playerId, or nickname. Adding as new player.`);
+      console.log(`DEBUG: Player not found by any means. Adding as new player.`);
       room.players.push(socket.id);
       playerScores.set(socket.id, 0);
       playerProfiles.set(socket.id, { nickname, isReady: true });
       playerIndex = room.players.length - 1;
     }
-    // Always use the current socket’s ID to determine the player’s index in the room’s players array
-    const playerNumber = room.players.indexOf(socket.id) + 1;
     
-    console.log(`DEBUG: Player ${socket.id} (${nickname}) assigned player number ${playerNumber} (index in array: ${room.players.indexOf(socket.id)})`);
-    console.log(`DEBUG: Creating players list for game join. Room players:`, room.players);
+    // Always use the player's actual index for their number
+    const playerNumber = playerIndex + 1;
+    
+    console.log(`DEBUG: Player ${socket.id} (${nickname}) assigned player number ${playerNumber} (index in array: ${playerIndex})`);
+    console.log(`DEBUG: Room players:`, room.players);
     console.log(`DEBUG: All player profiles:`, Array.from(playerProfiles.entries()));
     
     const players = room.players.map((playerId, index) => {
