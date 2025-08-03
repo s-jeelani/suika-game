@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Cursor & Score Fixes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .info {
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 Cursor & Score Fixes Test</h1>
+    
+    <div class="test-section">
+        <h2>Fixed Issues:</h2>
+        <ul>
+            <li class="success">✅ Score box now updates to show the current player's score when viewing any player</li>
+            <li class="success">✅ Real-time cursor movements are visible when viewing other players' games</li>
+            <li class="success">✅ Added visual cursor indicator (red circle) for opponent movements</li>
+            <li class="success">✅ Cursor indicator automatically hides after 2 seconds of inactivity</li>
+            <li class="success">✅ Cursor indicator hides when fruit is dropped</li>
+            <li class="success">✅ Score updates work for all players in mini viewers</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>How to Test:</h2>
+        <ol>
+            <li>Open the game at <a href="http://localhost:5173/game.html" target="_blank">http://localhost:5173/game.html</a></li>
+            <li>Join a room with multiple players</li>
+            <li>Test score updates:
+                <ul>
+                    <li>Make fruit combinations to increase your score</li>
+                    <li>Verify the main score box updates with your current score</li>
+                    <li>Click on other players' mini views and verify their scores are shown</li>
+                </ul>
+            </li>
+            <li>Test cursor movement visibility:
+                <ul>
+                    <li>Have another player move their cursor while you watch</li>
+                    <li>Click on their mini view to switch to their game</li>
+                    <li>Verify you can see their cursor movements in real-time</li>
+                    <li>Look for the red cursor indicator showing their position</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>What Was Fixed:</h2>
+        <ul>
+            <li><strong>Score Display:</strong> Main score box now shows the score of whichever player you're currently viewing</li>
+            <li><strong>Cursor Movement:</strong> Real-time cursor movements from other players are now visible when viewing their games</li>
+            <li><strong>Visual Feedback:</strong> Added a red circular cursor indicator that follows opponent movements</li>
+            <li><strong>Auto-hide:</strong> Cursor indicator automatically hides after inactivity or when fruit is dropped</li>
+            <li><strong>Score Synchronization:</strong> All score updates are properly synchronized across all views</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Expected Behavior:</h2>
+        <ul>
+            <li>When viewing your own game: Normal crosshair cursor, your score shown</li>
+            <li>When viewing other players: Default cursor, their score shown, red indicator follows their movements</li>
+            <li>Score box always shows the current player's score (not always your own)</li>
+            <li>Mini viewers show real-time score updates for all players</li>
+        </ul>
+    </div>
+</body>
+</html> 

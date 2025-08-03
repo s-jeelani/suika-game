@@ -28,7 +28,6 @@ let connectionStatus = null;
 let statusDot = null;
 let statusText = null;
 let nicknameInput = null;
-let updateProfileBtn = null;
 let roomNameInput = null;
 let maxPlayersSelect = null;
 let createRoomBtn = null;
@@ -53,7 +52,6 @@ function initializeDOMElements() {
   statusDot = document.querySelector('.status-dot');
   statusText = document.querySelector('.status-text');
   nicknameInput = document.getElementById('nickname');
-  updateProfileBtn = document.getElementById('update-profile');
   roomNameInput = document.getElementById('room-name');
   maxPlayersSelect = document.getElementById('max-players');
   createRoomBtn = document.getElementById('create-room');
@@ -94,49 +92,55 @@ function updatePlayerProfile() {
   
   currentPlayer.nickname = nickname;
   localStorage.setItem('suika-nickname', nickname);
-  
-  // Send profile update to server
-  socket.emit('updateProfile', {
-    nickname: nickname,
-    isReady: currentPlayer.isReady
-  });
 }
 
 // Create room
 function createRoom() {
   const roomName = roomNameInput.value.trim();
   const maxPlayers = parseInt(maxPlayersSelect.value);
+  const nickname = nicknameInput.value.trim();
   
   if (roomName.length < 3) {
     return;
   }
   
-  if (!currentPlayer.nickname) {
+  if (nickname.length < 2) {
+    alert('Please enter a nickname (at least 2 characters)');
     return;
   }
+  
+  // Update current player nickname
+  currentPlayer.nickname = nickname;
+  localStorage.setItem('suika-nickname', nickname);
   
   socket.emit('createRoom', {
     name: roomName,
     maxPlayers: maxPlayers,
-    hostNickname: currentPlayer.nickname
+    hostNickname: nickname
   });
 }
 
 // Join room
 function joinRoom() {
   const roomCode = roomCodeInput.value.trim();
+  const nickname = nicknameInput.value.trim();
   
   if (roomCode.length < 3) {
     return;
   }
   
-  if (!currentPlayer.nickname) {
+  if (nickname.length < 2) {
+    alert('Please enter a nickname (at least 2 characters)');
     return;
   }
   
+  // Update current player nickname
+  currentPlayer.nickname = nickname;
+  localStorage.setItem('suika-nickname', nickname);
+  
   socket.emit('joinRoom', {
     roomCode: roomCode,
-    nickname: currentPlayer.nickname
+    nickname: nickname
   });
 }
 
@@ -225,9 +229,6 @@ window.joinRoomByCode = function(code) {
 
 // Set up event listeners
 function setupEventListeners() {
-  // Profile
-  updateProfileBtn.addEventListener('click', updatePlayerProfile);
-  
   // Room management
   createRoomBtn.addEventListener('click', createRoom);
   joinRoomBtn.addEventListener('click', joinRoom);

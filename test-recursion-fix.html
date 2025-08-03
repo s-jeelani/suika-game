@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Recursion Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .info {
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Recursion Fix Test</h1>
+    
+    <div class="test-section">
+        <h2>Fixed Recursion Issues:</h2>
+        <ul>
+            <li class="success">✅ Fixed circular dependency between updateMiniViewer and updateMainGameControls</li>
+            <li class="success">✅ Added debouncing to updateMiniViewer to prevent excessive calls</li>
+            <li class="success">✅ Fixed variable name conflicts in socket event handlers</li>
+            <li class="success">✅ Added safeguards to prevent multiple event listener setups</li>
+            <li class="success">✅ Added safeguards to prevent multiple collision detection setups</li>
+            <li class="success">✅ Added safeguards to prevent multiple socket event setups</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>How to Test:</h2>
+        <ol>
+            <li>Open the game at <a href="http://localhost:5173/game.html" target="_blank">http://localhost:5173/game.html</a></li>
+            <li>Check the browser console for any recursion errors</li>
+            <li>Look for these debug messages:
+                <ul>
+                    <li>"Collision detection set up for all engines"</li>
+                    <li>"Socket events set up successfully"</li>
+                    <li>"Event listeners set up successfully"</li>
+                </ul>
+            </li>
+            <li>Verify that the game loads without "TOO MUCH RECURSION" errors</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>What Was Fixed:</h2>
+        <ul>
+            <li><strong>Circular Function Calls:</strong> Removed the circular dependency between updateMiniViewer and updateMainGameControls</li>
+            <li><strong>Variable Name Conflicts:</strong> Fixed conflicts between global gameState and local gameState variables</li>
+            <li><strong>Multiple Event Listeners:</strong> Added safeguards to prevent duplicate event listener registration</li>
+            <li><strong>Excessive Function Calls:</strong> Added debouncing to prevent rapid successive calls</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Debug Information:</h2>
+        <p>The console should now show clear debug messages about what's being set up and when.</p>
+        <p>If you still see recursion errors, check the console for the specific line numbers and function names.</p>
+    </div>
+</body>
+</html> 

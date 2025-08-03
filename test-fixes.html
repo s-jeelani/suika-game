@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Suika Fixes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .info {
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+    <h1>🍉 Suika Game Fixes Test</h1>
+    
+    <div class="test-section">
+        <h2>Fixed Issues:</h2>
+        <ul>
+            <li class="success">✅ Removed "Update Profile" button from lobby</li>
+            <li class="success">✅ Nickname is now used directly when joining rooms</li>
+            <li class="success">✅ Main game area shows "Your Game" instead of "{host}'s Game"</li>
+            <li class="success">✅ Added score update mechanism to broadcast score changes</li>
+            <li class="success">✅ Added debugging to track player profile issues</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>How to Test:</h2>
+        <ol>
+            <li>Open the lobby at <a href="http://localhost:5173/lobby.html" target="_blank">http://localhost:5173/lobby.html</a></li>
+            <li>Enter a nickname (no need to click "Update Profile")</li>
+            <li>Create a room or join an existing room</li>
+            <li>Start the game</li>
+            <li>Verify that:
+                <ul>
+                    <li>The main game area shows "Your Game"</li>
+                    <li>Mini viewers show actual player nicknames</li>
+                    <li>Score updates are visible in mini viewers</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>Server Status:</h2>
+        <p>Server should be running on port 3000</p>
+        <p>Client should be running on port 5173</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>Debug Information:</h2>
+        <p>Check the browser console and server console for debug messages about player profiles.</p>
+        <p>The server will now log detailed information about how player profiles are stored and retrieved.</p>
+    </div>
+</body>
+</html> 

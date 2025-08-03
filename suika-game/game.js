@@ -27,6 +27,13 @@ const engines = {};
 const renders = {};
 const gameStates = {};
 
+// Debouncing for updateMiniViewer to prevent recursion
+const updateMiniViewerTimeouts = {};
+
+// Visual cursor indicator for viewing other players
+let cursorIndicator = null;
+let cursorIndicatorTimeout = null;
+
 // DOM elements
 let mainPlayerName = null;
 let mainScore = null;
@@ -46,13 +53,33 @@ function initializeDOMElements() {
   loadingScreen = document.getElementById('loading-screen');
   loadingMessage = document.getElementById('loading-message');
   
+  // Create cursor indicator
+  cursorIndicator = document.createElement('div');
+  cursorIndicator.style.position = 'absolute';
+  cursorIndicator.style.width = '20px';
+  cursorIndicator.style.height = '20px';
+  cursorIndicator.style.borderRadius = '50%';
+  cursorIndicator.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+  cursorIndicator.style.border = '2px solid red';
+  cursorIndicator.style.pointerEvents = 'none';
+  cursorIndicator.style.zIndex = '1000';
+  cursorIndicator.style.display = 'none';
+  cursorIndicator.style.transition = 'all 0.1s ease';
+  
+  // Add to main canvas container
+  const canvasContainer = mainCanvas.parentElement;
+  if (canvasContainer) {
+    canvasContainer.style.position = 'relative';
+    canvasContainer.appendChild(cursorIndicator);
+  }
+  
   console.log('Game DOM elements initialized');
 }
 
   
 
 // Initialize physics engine for a player
-function initializePlayerEngine(playerNum, canvasWidth = 800, canvasHeight = 600) {
+function initializePlayerEngine(playerNum, canvasWidth = 400, canvasHeight = 600) {
   const engine = Engine.create();
   engine.world.gravity.y = 1;
   engine.world.gravity.scale = 0.001;
@@ -85,7 +112,7 @@ function initializePlayerEngine(playerNum, canvasWidth = 800, canvasHeight = 600
 }
 
 // Initialize world with walls
-function initializeWorld(world, canvasWidth = 800, canvasHeight = 600) {
+function initializeWorld(world, canvasWidth = 400, canvasHeight = 600) {
   console.log(`Initializing world with dimensions: ${canvasWidth}x${canvasHeight}`);
   
   const leftWall = Bodies.rectangle(15, canvasHeight/2, 30, canvasHeight, {
@@ -305,9 +332,9 @@ function createMiniViewer(playerNum, playerData) {
   
   viewersContainer.appendChild(viewerDiv);
   
-  // Initialize physics for this player with main canvas dimensions (800x600)
+  // Initialize physics for this player with main canvas dimensions (400x600)
   // This ensures consistent world coordinates across all players
-  initializePlayerEngine(playerNum, 800, 600);
+  initializePlayerEngine(playerNum, 400, 600);
   
   // Create simple mini render - no storage
   const miniRender = createSimpleRender(engines[playerNum], canvas);
@@ -325,25 +352,39 @@ function createMiniViewer(playerNum, playerData) {
 
 // Update mini viewer
 function updateMiniViewer(playerNum) {
-  const gameState = gameStates[playerNum];
-  if (!gameState) return;
-  
-  const scoreElement = document.getElementById(`score-${playerNum}`);
-  const statusElement = document.getElementById(`status-${playerNum}`);
-  
-  if (scoreElement) {
-    scoreElement.textContent = `Score: ${gameState.score}`;
+  // Clear existing timeout for this player
+  if (updateMiniViewerTimeouts[playerNum]) {
+    clearTimeout(updateMiniViewerTimeouts[playerNum]);
   }
   
-  if (statusElement) {
-    statusElement.textContent = gameState.disableAction ? 'Dropping...' : 'Playing';
-    statusElement.className = `mini-viewer-status ${gameState.disableAction ? 'waiting' : 'playing'}`;
-  }
-  
-  // Update main game controls if this is the current view (for real-time updates)
-  if (gameState.currentView === playerNum) {
-    updateMainGameControls(playerNum);
-  }
+  // Debounce the update to prevent excessive calls
+  updateMiniViewerTimeouts[playerNum] = setTimeout(() => {
+    const gameState = gameStates[playerNum];
+    if (!gameState) return;
+    
+    const scoreElement = document.getElementById(`score-${playerNum}`);
+    const statusElement = document.getElementById(`status-${playerNum}`);
+    
+    if (scoreElement) {
+      scoreElement.textContent = `Score: ${gameState.score}`;
+    }
+    
+    if (statusElement) {
+      statusElement.textContent = gameState.disableAction ? 'Dropping...' : 'Playing';
+      statusElement.className = `mini-viewer-status ${gameState.disableAction ? 'waiting' : 'playing'}`;
+    }
+    
+    // Update main game controls if this is the current view (for real-time updates)
+    // Only update if this is the currently viewed player to avoid recursion
+    if (gameState.currentView === playerNum && playerNum === gameState.playerNumber) {
+      updateMainGameControls(playerNum);
+    }
+    
+    // Also update main score if this is the currently viewed player (regardless of whose game it is)
+    if (gameState.currentView === playerNum) {
+      updateMainGameControls(playerNum);
+    }
+  }, 50); // 50ms debounce
 }
 
 
@@ -383,7 +424,7 @@ function switchToPlayerView(playerNum) {
   gameState.currentView = playerNum;
   
   // Update main canvas
-  mainCanvas.width = 800;
+  mainCanvas.width = 400;
   mainCanvas.height = 600;
   
   // Create one simple render for main canvas
@@ -396,7 +437,12 @@ function switchToPlayerView(playerNum) {
   // Update UI
   const playerData = gameState.players.find(p => p.number === playerNum);
   if (playerData) {
-    mainPlayerName.textContent = `${playerData.nickname}'s Game`;
+    // Show "Your Game" if viewing your own game, otherwise show the player's name
+    if (playerNum === gameState.playerNumber) {
+      mainPlayerName.textContent = 'Your Game';
+    } else {
+      mainPlayerName.textContent = `${playerData.nickname}'s Game`;
+    }
   }
   
   // Update active state
@@ -418,6 +464,20 @@ function switchToPlayerView(playerNum) {
   const isViewingOwnGame = playerNum === gameState.playerNumber;
   mainCanvas.style.cursor = isViewingOwnGame ? 'crosshair' : 'default';
   
+  // Show/hide cursor indicator based on whether viewing your own game
+  if (isViewingOwnGame) {
+    hideCursorIndicator();
+  } else {
+    // Show cursor indicator for other players' games
+    const opponentGameState = gameStates[playerNum];
+    if (opponentGameState && opponentGameState.currentBody) {
+      updateCursorIndicator(
+        opponentGameState.currentBody.position.x,
+        opponentGameState.currentBody.position.y
+      );
+    }
+  }
+  
   // Debug: Log canvas state and render info
   console.log(`Switched to player ${playerNum} view. Canvas size: ${mainCanvas.width}x${mainCanvas.height}`);
   console.log(`Canvas client size: ${mainCanvas.clientWidth}x${mainCanvas.clientHeight}`);
@@ -438,6 +498,7 @@ function updateMainGameControls(playerNum) {
   const gameState = gameStates[playerNum];
   if (!gameState) return;
   
+  // Always show the score of the currently viewed player
   mainScore.textContent = `Score: ${gameState.score}`;
 }
 
@@ -449,11 +510,20 @@ function getFruitEmoji(index) {
 
 // Set up collision detection
 function setupCollisionDetection() {
+  // Prevent multiple setups
+  if (setupCollisionDetection.isSetup) {
+    console.log('Collision detection already set up, skipping...');
+    return;
+  }
+  
   Object.keys(engines).forEach(playerNum => {
     Events.on(engines[playerNum], "collisionStart", (event) => {
       handleCollision(event, parseInt(playerNum));
     });
   });
+  
+  setupCollisionDetection.isSetup = true;
+  console.log('Collision detection set up for all engines');
 }
 
 // Handle collision
@@ -490,6 +560,13 @@ function handleCollision(event, playerNum) {
       // Add score
       const combinationScore = FRUIT_SCORES[index + 1] || 0;
       gameState.score += combinationScore;
+      
+      // Broadcast score update to other players
+      socket.emit('scoreUpdate', {
+        roomId: gameState.roomId,
+        playerNumber: playerNum,
+        score: gameState.score
+      });
       
       // Check for watermelon win
       if (index + 1 === 10) {
@@ -529,9 +606,9 @@ function showWinModal(winnerPlayerNum) {
     winMessage.textContent = `${winnerData.nickname} created a watermelon and won the game!`;
   }
   
-  const gameState = gameStates[winnerPlayerNum];
-  winScore.textContent = gameState.score;
-  winWatermelons.textContent = gameState.num_suika;
+  const winnerGameState = gameStates[winnerPlayerNum];
+  winScore.textContent = winnerGameState.score;
+  winWatermelons.textContent = winnerGameState.num_suika;
   
   winModal.classList.remove('hidden');
 }
@@ -553,8 +630,15 @@ const FRUIT_SCORES = {
 
 // Set up event listeners
 function setupEventListeners() {
+  // Prevent multiple setups
+  if (setupEventListeners.isSetup) {
+    console.log('Event listeners already set up, skipping...');
+    return;
+  }
+  
   // Main canvas click (will be managed by switchToPlayerView)
   mainCanvas.addEventListener('click', (e) => {
+    // Only allow clicking if viewing your own game
     if (gameState.currentView === gameState.playerNumber) {
       dropFruitForPlayer(gameState.playerNumber);
     }
@@ -562,8 +646,11 @@ function setupEventListeners() {
   
   // Main canvas mouse move (will be managed by switchToPlayerView)
   mainCanvas.addEventListener('mousemove', (e) => {
-    if (gameState.currentView === gameState.playerNumber) {
-      handleMouseMove(e, gameState.playerNumber);
+    // Handle mouse movement for the currently viewed player
+    const currentViewPlayer = gameState.currentView;
+    if (currentViewPlayer && currentViewPlayer === gameState.playerNumber) {
+      // Only handle mouse movement for your own game
+      handleMouseMove(e, currentViewPlayer);
     }
   });
   
@@ -576,6 +663,9 @@ function setupEventListeners() {
   document.getElementById('back-lobby').addEventListener('click', () => {
     window.location.href = '/lobby.html';
   });
+  
+  setupEventListeners.isSetup = true;
+  console.log('Event listeners set up successfully');
 }
 
 // Handle mouse movement
@@ -607,8 +697,50 @@ function handleMouseMove(event, playerNum) {
     });
 }
 
-// Set up socket events
+// Update cursor indicator position
+function updateCursorIndicator(x, y) {
+  if (!cursorIndicator) return;
+  
+  const rect = mainCanvas.getBoundingClientRect();
+  const canvasX = (x / 400) * rect.width; // Convert world coordinates to screen coordinates (400 width)
+  const canvasY = (y / 600) * rect.height;
+  
+  cursorIndicator.style.left = `${rect.left + canvasX - 10}px`;
+  cursorIndicator.style.top = `${rect.top + canvasY - 10}px`;
+  cursorIndicator.style.display = 'block';
+  
+  // Clear existing timeout
+  if (cursorIndicatorTimeout) {
+    clearTimeout(cursorIndicatorTimeout);
+  }
+  
+  // Hide cursor indicator after 2 seconds of inactivity
+  cursorIndicatorTimeout = setTimeout(() => {
+    hideCursorIndicator();
+  }, 2000);
+}
+
+// Hide cursor indicator
+function hideCursorIndicator() {
+  if (cursorIndicator) {
+    cursorIndicator.style.display = 'none';
+  }
+  
+  // Clear timeout
+  if (cursorIndicatorTimeout) {
+    clearTimeout(cursorIndicatorTimeout);
+    cursorIndicatorTimeout = null;
+  }
+}
+
+// Socket event handlers
 function setupSocketEvents() {
+  // Prevent multiple setups
+  if (setupSocketEvents.isSetup) {
+    console.log('Socket events already set up, skipping...');
+    return;
+  }
+  
   // Connection events
   socket.on('connect', () => {
     console.log('Connected to game server');
@@ -640,8 +772,8 @@ function setupSocketEvents() {
     gameState.players = data.players;
     gameState.maxPlayers = data.maxPlayers;
     
-    // Set main canvas to much larger size for better visibility
-    mainCanvas.width = 800;
+    // Set main canvas to narrower size for better gameplay
+    mainCanvas.width = 400;
     mainCanvas.height = 600;
     // Initialize main player with canvas dimensions
     initializePlayerEngine(gameState.playerNumber, mainCanvas.width, mainCanvas.height);
@@ -694,22 +826,39 @@ function setupSocketEvents() {
   
   socket.on('opponentFruitMove', (data) => {
     if (data.playerNumber !== gameState.playerNumber) {
-      const gameState = gameStates[data.playerNumber];
-      if (gameState && gameState.currentBody) {
-        Body.setPosition(gameState.currentBody, {
+      const opponentGameState = gameStates[data.playerNumber];
+      if (opponentGameState && opponentGameState.currentBody) {
+        Body.setPosition(opponentGameState.currentBody, {
           x: data.x,
           y: data.y
         });
+        
+        // If we're currently viewing this player's game, update the render immediately
+        if (gameState.currentView === data.playerNumber) {
+          const render = renders[data.playerNumber];
+          if (render) {
+            // Force a render update to show the cursor movement
+            Render.world(render);
+          }
+          
+          // Show cursor indicator for the opponent's movement
+          updateCursorIndicator(data.x, data.y);
+        }
       }
     }
   });
   
   socket.on('opponentFruitDropped', (data) => {
     if (data.playerNumber !== gameState.playerNumber) {
-      const gameState = gameStates[data.playerNumber];
-      if (gameState && gameState.currentBody) {
-        gameState.currentBody.isSleeping = false;
-        gameState.currentBody.isDropped = true;
+      const opponentGameState = gameStates[data.playerNumber];
+      if (opponentGameState && opponentGameState.currentBody) {
+        opponentGameState.currentBody.isSleeping = false;
+        opponentGameState.currentBody.isDropped = true;
+        
+        // Hide cursor indicator when fruit is dropped
+        if (gameState.currentView === data.playerNumber) {
+          hideCursorIndicator();
+        }
       }
     }
   });
@@ -717,6 +866,18 @@ function setupSocketEvents() {
   socket.on('opponentCompleteState', (data) => {
     if (data.gameState && data.gameState.playerNumber !== gameState.playerNumber) {
       applyOpponentGameState(data.gameState);
+    }
+  });
+  
+  socket.on('scoreUpdate', (data) => {
+    console.log('Score update received:', data);
+    if (data.playerNumber !== gameState.playerNumber) {
+      // Update the opponent's score in their game state
+      const opponentGameState = gameStates[data.playerNumber];
+      if (opponentGameState) {
+        opponentGameState.score = data.score;
+        updateMiniViewer(data.playerNumber);
+      }
     }
   });
   
@@ -729,6 +890,9 @@ function setupSocketEvents() {
   socket.on('error', (data) => {
     alert(`Game Error: ${data.message}`);
   });
+  
+  setupSocketEvents.isSetup = true;
+  console.log('Socket events set up successfully');
 }
 
 // Test sprite loading

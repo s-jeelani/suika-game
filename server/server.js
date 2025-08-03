@@ -229,6 +229,28 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle score updates
+  socket.on('scoreUpdate', ({ roomId, playerNumber, score }) => {
+    console.log(`📊 Score update: Player ${playerNumber} in room ${roomId} has score ${score}`);
+    
+    const room = gameRooms.get(roomId);
+    if (room) {
+      // Update the score in the room
+      room.scores[playerNumber] = score;
+      
+      // Broadcast score update to all players in the room
+      io.to(roomId).emit('scoreUpdate', {
+        playerNumber: playerNumber,
+        score: score,
+        roomId: roomId
+      });
+      
+      console.log(`✅ Score update broadcasted to room ${roomId}`);
+    } else {
+      console.log(`❌ Room ${roomId} not found for score update`);
+    }
+  });
+
   // Handle player profile updates
   socket.on('updateProfile', ({ nickname, isReady }) => {
     console.log('Player profile update:', { socketId: socket.id, nickname, isReady });
@@ -329,17 +351,24 @@ io.on('connection', (socket) => {
     playerScores.set(socket.id, 0);
     playerProfiles.set(socket.id, { nickname, isReady: true });
     
+    console.log(`DEBUG: Stored profile for ${socket.id}:`, playerProfiles.get(socket.id));
+    console.log(`DEBUG: All profiles:`, Array.from(playerProfiles.entries()));
+    
     const playerNumber = room.players.length;
     console.log(`Player ${nickname} joined as player ${playerNumber}. Room now has ${room.players.length} players.`);
     
     // Create players list
-    const players = room.players.map((playerId, index) => ({
-      id: playerId,
-      number: index + 1,
-      nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 1}`,
-      isHost: playerId === room.hostId,
-      isReady: playerProfiles.get(playerId)?.isReady || false
-    }));
+    const players = room.players.map((playerId, index) => {
+      const profile = playerProfiles.get(playerId);
+      console.log(`DEBUG: Getting profile for ${playerId}:`, profile);
+      return {
+        id: playerId,
+        number: index + 1,
+        nickname: profile?.nickname || `Player ${index + 1}`,
+        isHost: playerId === room.hostId,
+        isReady: profile?.isReady || false
+      };
+    });
     
     socket.join(roomCode);
     
@@ -357,13 +386,7 @@ io.on('connection', (socket) => {
       players
     });
     
-    // Check if game can start
-    if (room.players.length >= 2 && room.players.every(playerId => playerProfiles.get(playerId)?.isReady)) {
-      const hostProfile = playerProfiles.get(room.hostId);
-      if (hostProfile) {
-        socket.to(room.hostId).emit('gameReady', { roomId: roomCode });
-      }
-    }
+    console.log(`Room ${roomCode} now has ${room.players.length} players:`, players.map(p => p.nickname));
   });
 
   // Handle leaving room
@@ -491,13 +514,22 @@ io.on('connection', (socket) => {
     
     const playerNumber = playerIndex + 1;
     
-    const players = room.players.map((playerId, index) => ({
-      id: playerId,
-      number: index + 1,
-      nickname: playerProfiles.get(playerId)?.nickname || `Player ${index + 1}`,
-      isHost: playerId === room.hostId,
-      isReady: true
-    }));
+    console.log(`DEBUG: Creating players list for game join. Room players:`, room.players);
+    console.log(`DEBUG: All player profiles:`, Array.from(playerProfiles.entries()));
+    
+    const players = room.players.map((playerId, index) => {
+      const profile = playerProfiles.get(playerId);
+      console.log(`DEBUG: Getting profile for ${playerId} (player ${index + 1}):`, profile);
+      return {
+        id: playerId,
+        number: index + 1,
+        nickname: profile?.nickname || `Player ${index + 1}`,
+        isHost: playerId === room.hostId,
+        isReady: true
+      };
+    });
+    
+    console.log(`DEBUG: Final players list:`, players);
     
     socket.emit('gameJoined', {
       roomId,

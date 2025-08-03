@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Narrower Game Box</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .info {
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+    <h1>📏 Narrower Game Box Test</h1>
+    
+    <div class="test-section">
+        <h2>Changes Made:</h2>
+        <ul>
+            <li class="success">✅ Game box width reduced from 800px to 400px (50% narrower)</li>
+            <li class="success">✅ Game box height kept at 600px (same height)</li>
+            <li class="success">✅ All fruit sizes scaled down by 25%</li>
+            <li class="success">✅ Wall positions adjusted for new dimensions</li>
+            <li class="success">✅ Cursor indicator coordinates updated</li>
+            <li class="success">✅ All physics calculations updated for new dimensions</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>How to Test:</h2>
+        <ol>
+            <li>Open the game at <a href="http://localhost:5173/game.html" target="_blank">http://localhost:5173/game.html</a></li>
+            <li>Join a room and start playing</li>
+            <li>Verify the changes:
+                <ul>
+                    <li>The game box should be noticeably narrower (tall and skinny)</li>
+                    <li>All fruits should be 25% smaller than before</li>
+                    <li>The game should still be fully playable</li>
+                    <li>Collisions and physics should work correctly</li>
+                    <li>Cursor movement should work within the new boundaries</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>Technical Details:</h2>
+        <ul>
+            <li><strong>Canvas Dimensions:</strong> Changed from 800x600 to 400x600</li>
+            <li><strong>Fruit Scaling:</strong> All radii multiplied by 0.75 (25% reduction)</li>
+            <li><strong>Wall Positions:</strong> Left wall at 15px, right wall at 385px (400-15)</li>
+            <li><strong>Boundary Calculations:</strong> Updated to use new canvas width</li>
+            <li><strong>Coordinate Systems:</strong> All world-to-screen conversions updated</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Expected Behavior:</h2>
+        <ul>
+            <li>Game box appears as a tall, narrow rectangle</li>
+            <li>Fruits are smaller but still clearly visible</li>
+            <li>Gameplay feels more focused and challenging</li>
+            <li>All multiplayer features still work correctly</li>
+            <li>Mini viewers and score displays work as before</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Fruit Size Changes:</h2>
+        <ul>
+            <li>Cherry: ~12.4px radius (was ~16.5px)</li>
+            <li>Strawberry: ~18px radius (was ~24px)</li>
+            <li>Grape: ~22.9px radius (was ~30.5px)</li>
+            <li>Orange: ~33.4px radius (was ~44.5px)</li>
+            <li>Apple: ~42.8px radius (was ~57px)</li>
+            <li>And so on for all fruits...</li>
+        </ul>
+    </div>
+</body>
+</html> 
