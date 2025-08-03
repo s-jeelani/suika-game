@@ -312,10 +312,16 @@ function applyOpponentGameState(stateData) {
 
 // Create mini viewer for a player
 function createMiniViewer(playerNum, playerData) {
+  // Prevent creating duplicate viewers for the same player
+  if (document.getElementById(`viewer-${playerNum}`)) {
+    console.warn(`Mini viewer for player ${playerNum} already exists. Skipping creation.`);
+    return;
+  }
+
   const viewerDiv = document.createElement('div');
   viewerDiv.className = 'mini-viewer';
   viewerDiv.id = `viewer-${playerNum}`;
-
+  
   // Build the viewer HTML (including the canvas that will actually be in the DOM)
   viewerDiv.innerHTML = `
     <div class="mini-viewer-header">
@@ -325,27 +331,31 @@ function createMiniViewer(playerNum, playerData) {
     <canvas id="canvas-${playerNum}" width="300" height="150"></canvas>
     <div class="mini-viewer-status" id="status-${playerNum}">Waiting...</div>
   `;
-
+  
   // Append to DOM *before* we start rendering so the canvas is present
   viewersContainer.appendChild(viewerDiv);
-
+  
   // Grab the canvas that now exists inside the viewer
   const canvas = viewerDiv.querySelector('canvas');
 
-  // Initialize physics for this player (use main-game dimensions for consistency)
-  initializePlayerEngine(playerNum, 400, 600);
-
+  // --- ENGINE INITIALISATION -------------------------------------------------
+  // Only create a new physics engine if we don't already have one for this player.
+  // This avoids overwriting the main player engine (and prevents score resets / recursion).
+  if (!engines[playerNum]) {
+    initializePlayerEngine(playerNum, 400, 600);
+  }
+  
   // Create and run the Matter.js render on the **actual** DOM canvas
   const miniRender = createSimpleRender(engines[playerNum], canvas);
   renders[playerNum] = miniRender;
   Render.run(miniRender);
-
+  
   // Allow clicking the mini-viewer to switch the main view
   viewerDiv.addEventListener('click', () => {
     console.log(`Clicked on player ${playerNum} mini viewer`);
     switchToPlayerView(playerNum);
   });
-
+  
   // Immediately request the opponent's full state so their objects & score appear
   if (playerNum !== gameState.playerNumber && gameState.roomId) {
     console.log(`Requesting immediate complete state for player ${playerNum}`);
@@ -354,9 +364,9 @@ function createMiniViewer(playerNum, playerData) {
       requestedPlayerNumber: playerNum
     });
   }
-
+  
   console.log(`Mini viewer created for player ${playerNum}: ${playerData.nickname}`);
-}
+  }
 
 // Update mini viewer
 function updateMiniViewer(playerNum) {
@@ -835,8 +845,15 @@ function setupSocketEvents() {
     renders[gameState.playerNumber] = initialRender;
     Render.run(initialRender);
     
-    // Create mini viewers for all players (including your own)
-    data.players.forEach(player => {
+    // Create mini viewers with YOURSELF first, then others – client-specific order
+    const sortedPlayers = [...data.players].sort((pA, pB) => {
+      // put my own player (data.playerNumber) at the front
+      if (pA.number === data.playerNumber) return -1;
+      if (pB.number === data.playerNumber) return 1;
+      return pA.number - pB.number; // keep deterministic order for remaining
+    });
+
+    sortedPlayers.forEach(player => {
         createMiniViewer(player.number, player);
     });
     

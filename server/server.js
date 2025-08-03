@@ -518,39 +518,21 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Check if player is in room by socket ID or by nickname
+    // Check if player is already in room by socket ID ONLY
     let playerIndex = room.players.indexOf(socket.id);
     console.log(`Player ${socket.id} (${nickname}) checking room ${roomId}`);
     console.log(`Room players:`, room.players);
     
     if (playerIndex === -1) {
-      // Try to find player by nickname (for new socket connections)
-      const playerProfilesArray = Array.from(playerProfiles.entries());
-      const playerEntry = playerProfilesArray.find(([id, profile]) => profile.nickname === nickname);
-      
-      if (playerEntry) {
-        const oldSocketId = playerEntry[0];
-        playerIndex = room.players.indexOf(oldSocketId);
-        console.log(`Found player by nickname: ${nickname} -> ${oldSocketId}, index: ${playerIndex}`);
-        
-        if (playerIndex !== -1) {
-          // Update the player's socket ID to the new connection
-          room.players[playerIndex] = socket.id;
-          playerProfiles.set(socket.id, playerProfiles.get(oldSocketId));
-          playerProfiles.delete(oldSocketId);
-          console.log(`Updated socket ID for player ${nickname}: ${oldSocketId} -> ${socket.id}`);
-        }
-      } else {
-        console.log(`No player profile found for nickname: ${nickname}`);
-      }
-    } else {
-      console.log(`Player ${socket.id} found directly in room at index ${playerIndex}`);
-    }
-    
-    if (playerIndex === -1) {
-      socket.emit('error', { message: 'Player not in room' });
+      console.log(`Socket ${socket.id} not found in room players. This should not happen if they joined lobby properly.`);
+      socket.emit('error', { message: 'Player not in room - please rejoin from lobby' });
       return;
     }
+    
+    console.log(`Player ${socket.id} found directly in room at index ${playerIndex}`);
+    
+    // Update their profile with the provided nickname (in case it changed)
+    playerProfiles.set(socket.id, { nickname, isReady: true });
     
     const playerNumber = playerIndex + 1;
     
