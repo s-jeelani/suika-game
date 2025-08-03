@@ -251,6 +251,20 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle fruit movement updates
+  socket.on('fruitMove', ({ roomId, playerNumber, x, y }) => {
+    const room = gameRooms.get(roomId);
+    if (room) {
+      // Broadcast fruit movement to all other players in the room
+      socket.to(roomId).emit('opponentFruitMove', {
+        playerNumber: playerNumber,
+        x: x,
+        y: y,
+        roomId: roomId
+      });
+    }
+  });
+
   // Handle player profile updates
   socket.on('updateProfile', ({ nickname, isReady }) => {
     console.log('Player profile update:', { socketId: socket.id, nickname, isReady });

@@ -1,47 +1,47 @@
 export const FRUITS = [
     {
       name: "00_cherry",
-      radius: (33 / 2) * 0.75, // 25% smaller
+      radius: (33 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "01_strawberry",
-      radius: (48 / 2) * 0.75, // 25% smaller
+      radius: (48 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "02_grape",
-      radius: (61 / 2) * 0.75, // 25% smaller
+      radius: (61 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "03_gyool",
-      radius: (69 / 2) * 0.75, // 25% smaller
+      radius: (69 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "04_orange",
-      radius: (89 / 2) * 0.75, // 25% smaller
+      radius: (89 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "05_apple",
-      radius: (114 / 2) * 0.75, // 25% smaller
+      radius: (114 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "06_pear",
-      radius: (129 / 2) * 0.75, // 25% smaller
+      radius: (129 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "07_peach",
-      radius: (156 / 2) * 0.75, // 25% smaller
+      radius: (156 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "08_pineapple",
-      radius: (177 / 2) * 0.75, // 25% smaller
+      radius: (177 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "09_melon",
-      radius: (220 / 2) * 0.75, // 25% smaller
+      radius: (220 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
     {
       name: "10_watermelon",
-      radius: (259 / 2) * 0.75, // 25% smaller
+      radius: (259 / 2) * 0.75 * 0.75, // Another 25% smaller (total 50% reduction)
     },
   ];
   

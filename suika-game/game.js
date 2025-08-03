@@ -352,37 +352,36 @@ function createMiniViewer(playerNum, playerData) {
 
 // Update mini viewer
 function updateMiniViewer(playerNum) {
-  // Clear existing timeout for this player
+  // Clear existing timeout for this player to prevent excessive calls
   if (updateMiniViewerTimeouts[playerNum]) {
     clearTimeout(updateMiniViewerTimeouts[playerNum]);
   }
   
   // Debounce the update to prevent excessive calls
   updateMiniViewerTimeouts[playerNum] = setTimeout(() => {
-    const gameState = gameStates[playerNum];
-    if (!gameState) return;
+    const playerGameState = gameStates[playerNum];
+    if (!playerGameState) return;
     
+    // Update mini viewer score display
     const scoreElement = document.getElementById(`score-${playerNum}`);
     const statusElement = document.getElementById(`status-${playerNum}`);
     
     if (scoreElement) {
-      scoreElement.textContent = `Score: ${gameState.score}`;
+      scoreElement.textContent = `Score: ${playerGameState.score}`;
     }
     
     if (statusElement) {
-      statusElement.textContent = gameState.disableAction ? 'Dropping...' : 'Playing';
-      statusElement.className = `mini-viewer-status ${gameState.disableAction ? 'waiting' : 'playing'}`;
+      statusElement.textContent = playerGameState.disableAction ? 'Dropping...' : 'Playing';
+      statusElement.className = `mini-viewer-status ${playerGameState.disableAction ? 'waiting' : 'playing'}`;
     }
     
-    // Update main game controls if this is the current view (for real-time updates)
-    // Only update if this is the currently viewed player to avoid recursion
-    if (gameState.currentView === playerNum && playerNum === gameState.playerNumber) {
-      updateMainGameControls(playerNum);
-    }
-    
-    // Also update main score if this is the currently viewed player (regardless of whose game it is)
+    // IMPORTANT: Only update main score if this is the currently viewed player
+    // This prevents recursion and ensures the main score shows the correct player
     if (gameState.currentView === playerNum) {
-      updateMainGameControls(playerNum);
+      // Direct update without calling updateMainGameControls to prevent recursion
+      if (mainScore) {
+        mainScore.textContent = `Score: ${playerGameState.score}`;
+      }
     }
   }, 50); // 50ms debounce
 }
@@ -528,8 +527,8 @@ function setupCollisionDetection() {
 
 // Handle collision
 function handleCollision(event, playerNum) {
-  const gameState = gameStates[playerNum];
-  if (!gameState) return;
+  const playerGameState = gameStates[playerNum];
+  if (!playerGameState) return;
   
   event.pairs.forEach((collision) => {
     if (collision.bodyA.index === collision.bodyB.index) {
@@ -539,7 +538,7 @@ function handleCollision(event, playerNum) {
         return;
       }
 
-      World.remove(gameState.world, [collision.bodyA, collision.bodyB]);
+      World.remove(playerGameState.world, [collision.bodyA, collision.bodyB]);
 
       const newFruit = FRUITS[index + 1];
       const newBody = Bodies.circle(
@@ -555,35 +554,39 @@ function handleCollision(event, playerNum) {
         }
       );
 
-      World.add(gameState.world, newBody);
+      World.add(playerGameState.world, newBody);
 
       // Add score
       const combinationScore = FRUIT_SCORES[index + 1] || 0;
-      gameState.score += combinationScore;
+      playerGameState.score += combinationScore;
+      
+      console.log(`Player ${playerNum} scored ${combinationScore} points, total: ${playerGameState.score}`);
       
       // Broadcast score update to other players
       socket.emit('scoreUpdate', {
         roomId: gameState.roomId,
         playerNumber: playerNum,
-        score: gameState.score
+        score: playerGameState.score
       });
+      
+      // Update mini viewer for this player
+      updateMiniViewer(playerNum);
       
       // Check for watermelon win
       if (index + 1 === 10) {
         console.log(`🎉 Player ${playerNum} created a WATERMELON! Game Over!`);
         
+        playerGameState.num_suika += 1;
+        
         socket.emit('playerWon', {
           roomId: gameState.roomId,
           playerNumber: playerNum,
-          score: gameState.score,
-          num_suika: gameState.num_suika
+          score: playerGameState.score,
+          num_suika: playerGameState.num_suika
         });
         
         showWinModal(playerNum);
       }
-      
-      // Update mini viewer
-      updateMiniViewer(playerNum);
     }
   });
 }
@@ -702,14 +705,19 @@ function updateCursorIndicator(x, y) {
   if (!cursorIndicator) return;
   
   const rect = mainCanvas.getBoundingClientRect();
-  const canvasX = (x / 400) * rect.width; // Convert world coordinates to screen coordinates (400 width)
+  const currentViewGameState = gameStates[gameState.currentView];
+  const worldWidth = currentViewGameState?.canvasWidth || 400;
+  
+  // Convert world coordinates to screen coordinates
+  const canvasX = (x / worldWidth) * rect.width;
   const canvasY = (y / 600) * rect.height;
   
+  // Update cursor indicator position
   cursorIndicator.style.left = `${rect.left + canvasX - 10}px`;
   cursorIndicator.style.top = `${rect.top + canvasY - 10}px`;
   cursorIndicator.style.display = 'block';
   
-  // Clear existing timeout
+  // Clear existing timeout and set new one
   if (cursorIndicatorTimeout) {
     clearTimeout(cursorIndicatorTimeout);
   }
@@ -828,20 +836,14 @@ function setupSocketEvents() {
     if (data.playerNumber !== gameState.playerNumber) {
       const opponentGameState = gameStates[data.playerNumber];
       if (opponentGameState && opponentGameState.currentBody) {
+        // Update the opponent's fruit position
         Body.setPosition(opponentGameState.currentBody, {
           x: data.x,
           y: data.y
         });
         
-        // If we're currently viewing this player's game, update the render immediately
+        // If we're currently viewing this player's game, show cursor indicator
         if (gameState.currentView === data.playerNumber) {
-          const render = renders[data.playerNumber];
-          if (render) {
-            // Force a render update to show the cursor movement
-            Render.world(render);
-          }
-          
-          // Show cursor indicator for the opponent's movement
           updateCursorIndicator(data.x, data.y);
         }
       }
@@ -876,7 +878,15 @@ function setupSocketEvents() {
       const opponentGameState = gameStates[data.playerNumber];
       if (opponentGameState) {
         opponentGameState.score = data.score;
+        console.log(`Updated player ${data.playerNumber} score to ${data.score}`);
+        
+        // Update the mini viewer for this player
         updateMiniViewer(data.playerNumber);
+        
+        // If we're currently viewing this player, update the main score immediately
+        if (gameState.currentView === data.playerNumber && mainScore) {
+          mainScore.textContent = `Score: ${data.score}`;
+        }
       }
     }
   });
