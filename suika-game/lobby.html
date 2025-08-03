@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Suika Game Lobby</title>
-    <link rel="stylesheet" href="lobby.css">
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 </head>
 <body>
@@ -88,16 +87,9 @@
             </div>
         </section>
 
-        <!-- Game Launch Section -->
-        <section id="game-launch" style="display: none;">
-            <h2>Game Ready!</h2>
-            <div class="launch-info">
-                <p>All players are ready. Click to start the game!</p>
-                <button id="launch-game">Launch Suika Game</button>
-            </div>
-        </section>
+        <!-- Game Launch Section - Removed, game starts automatically -->
     </div>
 
-    <script type="module" src="lobby.js"></script>
+    <script type="module" src="/lobby.js"></script>
 </body>
 </html> 

@@ -543,7 +543,27 @@ io.on('connection', (socket) => {
       return;
     }
     
-    const playerIndex = room.players.indexOf(socket.id);
+    // Check if player is in room by socket ID or by nickname
+    let playerIndex = room.players.indexOf(socket.id);
+    if (playerIndex === -1) {
+      // Try to find player by nickname (for new socket connections)
+      const playerProfilesArray = Array.from(playerProfiles.entries());
+      const playerEntry = playerProfilesArray.find(([id, profile]) => profile.nickname === nickname);
+      
+      if (playerEntry) {
+        const oldSocketId = playerEntry[0];
+        playerIndex = room.players.indexOf(oldSocketId);
+        
+        if (playerIndex !== -1) {
+          // Update the player's socket ID to the new connection
+          room.players[playerIndex] = socket.id;
+          playerProfiles.set(socket.id, playerProfiles.get(oldSocketId));
+          playerProfiles.delete(oldSocketId);
+          console.log(`Updated socket ID for player ${nickname}: ${oldSocketId} -> ${socket.id}`);
+        }
+      }
+    }
+    
     if (playerIndex === -1) {
       socket.emit('error', { message: 'Player not in room' });
       return;

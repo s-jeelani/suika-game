@@ -7,11 +7,19 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     rollupOptions: {
+      input: {
+        main: 'index.html',
+        lobby: 'lobby.html',
+        game: 'game.html'
+      },
       output: {
         manualChunks: undefined,
       }
     },
     copyPublicDir: true
+  },
+  css: {
+    modules: false
   },
   assetsInclude: ['**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.svg'],
   publicDir: 'public',

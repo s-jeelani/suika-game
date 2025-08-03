@@ -1,4 +1,5 @@
 import { SERVER_URL } from './config.js';
+import './lobby.css';
 
 // Socket.IO connection
 console.log('Connecting to server:', SERVER_URL);
@@ -69,8 +70,7 @@ function initializeDOMElements() {
   playersContainer = document.getElementById('players-container');
   roomsContainer = document.getElementById('rooms-container');
   refreshRoomsBtn = document.getElementById('refresh-rooms');
-  gameLaunchSection = document.getElementById('game-launch');
-  launchGameBtn = document.getElementById('launch-game');
+  // gameLaunchSection removed - game starts automatically
   
   console.log('DOM elements initialized');
 }
@@ -162,15 +162,7 @@ function startGame() {
   }
 }
 
-// Launch game
-function launchGame() {
-  // Store room info for the game
-  localStorage.setItem('suika-room-id', currentRoom.id);
-  localStorage.setItem('suika-player-nickname', currentPlayer.nickname);
-  
-  // Navigate to game
-  window.location.href = 'game.html';
-}
+  // Launch game function removed - game starts automatically when host clicks start
 
 // Refresh available rooms
 function refreshRooms() {
@@ -250,8 +242,7 @@ function setupEventListeners() {
   leaveRoomBtn.addEventListener('click', leaveRoom);
   startGameBtn.addEventListener('click', startGame);
   
-  // Game launch
-  launchGameBtn.addEventListener('click', launchGame);
+  // Game launch - removed, game starts automatically
   
   // Rooms
   refreshRoomsBtn.addEventListener('click', refreshRooms);
@@ -382,8 +373,13 @@ function setupSocketEvents() {
   
   socket.on('gameStarting', (data) => {
     console.log('Game starting:', data);
-    gameLaunchSection.style.display = 'block';
-    startGameBtn.disabled = true;
+    
+    // Store room info for the game
+    localStorage.setItem('suika-room-id', currentRoom.id);
+    localStorage.setItem('suika-player-nickname', currentPlayer.nickname);
+    
+    // Navigate to game immediately
+    window.location.href = '/game';
   });
   
   socket.on('error', (data) => {
@@ -404,7 +400,6 @@ function updateRoomDisplay() {
     startGameBtn.disabled = !currentPlayer.isHost || currentRoom.players.length < 2;
   } else {
     currentRoomSection.style.display = 'none';
-    gameLaunchSection.style.display = 'none';
   }
 }
 

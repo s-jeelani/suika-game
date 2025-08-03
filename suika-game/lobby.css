@@ -323,36 +323,7 @@ button.success:hover:not(:disabled) {
     text-transform: uppercase;
 }
 
-/* Game Launch */
-#game-launch {
-    background: linear-gradient(135deg, #E6B143 0%, #D4A574 50%, #C19A6B 100%);
-    color: white;
-    text-align: center;
-    border: 3px solid #8B4513;
-}
-
-#game-launch h2 {
-    color: white;
-    border-bottom-color: rgba(255, 255, 255, 0.3);
-}
-
-.launch-info p {
-    font-size: 18px;
-    margin-bottom: 20px;
-    opacity: 0.9;
-}
-
-#launch-game {
-    background: #228B22;
-    font-size: 20px;
-    padding: 15px 30px;
-}
-
-#launch-game:hover {
-    background: #32CD32;
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(34, 139, 34, 0.4);
-}
+/* Game Launch - Removed, game starts automatically */
 
 /* Utility Classes */
 .no-players, .no-rooms {
